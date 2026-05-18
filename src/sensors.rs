@@ -90,10 +90,6 @@ impl HwmonDevices {
     }
 }
 
-pub fn read_current_sensor_data() -> SensorData {
-    read_current_sensor_data_result().unwrap_or_default()
-}
-
 pub fn read_current_sensor_data_result() -> io::Result<SensorData> {
     HwmonDevices::discover().map(|devices| devices.read_sensor_data())
 }
