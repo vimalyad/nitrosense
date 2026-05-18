@@ -20,7 +20,7 @@ Branch: `phase-0-project-planning`
 - [x] Add a local-only change log.
 - [x] Ignore `CHANGES.md` in Git.
 - [x] Create this implementation roadmap.
-- [ ] Commit the planning and tracking setup.
+- [x] Commit the planning and tracking setup.
 - [ ] Ask for review before pushing.
 
 ## Phase 1: Rust Project Foundation
