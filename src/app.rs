@@ -3,8 +3,10 @@ use eframe::egui;
 use tokio::runtime::Runtime;
 use tokio::sync::watch;
 
+use crate::config::AppConfig;
 use crate::fan_control::{self, FanControlStatus, FanId};
 use crate::graph::{show_graph, GraphHistory, GraphVisibility};
+use crate::notifications::{send_desktop_notification, ThermalAlertState};
 use crate::polling::{spawn_sensor_polling, SensorSnapshot};
 use crate::profile::{self, PowerProfile};
 use crate::sensors::SensorData;
@@ -51,6 +53,9 @@ struct NitroSenseApp {
     cpu_fan_percent: u8,
     gpu_fan_percent: u8,
     fan_control_message: Option<String>,
+    app_config: AppConfig,
+    thermal_alerts: ThermalAlertState,
+    notification_status: Option<String>,
     active_tab: AppTab,
 }
 
@@ -77,6 +82,9 @@ impl NitroSenseApp {
             cpu_fan_percent: 50,
             gpu_fan_percent: 50,
             fan_control_message: None,
+            app_config: AppConfig::default(),
+            thermal_alerts: ThermalAlertState::default(),
+            notification_status: None,
             active_tab: AppTab::Overview,
         }
     }
@@ -94,6 +102,7 @@ impl eframe::App for NitroSenseApp {
             ui.add_space(12.0);
             self.show_stats(ui);
             self.show_polling_status(ui);
+            self.show_notification_status(ui);
             ui.add_space(12.0);
             self.show_tabs(ui);
             ui.separator();
@@ -109,6 +118,31 @@ impl NitroSenseApp {
             self.sensor_snapshot = self.sensor_receiver.borrow_and_update().clone();
             self.graph_history
                 .push(std::time::Instant::now(), &self.sensor_snapshot.data);
+            self.process_thermal_alerts();
+        }
+    }
+
+    fn process_thermal_alerts(&mut self) {
+        let now = std::time::Instant::now();
+        let alerts =
+            self.thermal_alerts
+                .pending_alerts(&self.sensor_snapshot.data, &self.app_config, now);
+
+        for alert in alerts {
+            match send_desktop_notification(&alert) {
+                Ok(()) => {
+                    self.thermal_alerts.mark_sent(&alert, now);
+                    self.notification_status = Some(format!(
+                        "{} notification sent: {}",
+                        alert.kind.title(),
+                        alert.message()
+                    ));
+                }
+                Err(error) => {
+                    self.notification_status =
+                        Some(format!("Could not send thermal notification: {error}"));
+                }
+            }
         }
     }
 
@@ -271,6 +305,13 @@ impl NitroSenseApp {
                 egui::Color32::from_rgb(180, 90, 40),
                 format!("Sensor polling issue: {error}"),
             );
+        }
+    }
+
+    fn show_notification_status(&self, ui: &mut egui::Ui) {
+        if let Some(status) = &self.notification_status {
+            ui.add_space(8.0);
+            ui.label(status);
         }
     }
 
