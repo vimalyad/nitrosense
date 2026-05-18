@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+use notify_rust::Notification;
+
 use crate::config::AppConfig;
 use crate::sensors::SensorData;
 
@@ -109,6 +111,15 @@ pub fn evaluate_alerts(data: &SensorData, config: &AppConfig) -> Vec<ThermalAler
     }
 
     alerts
+}
+
+pub fn send_desktop_notification(alert: &ThermalAlert) -> notify_rust::error::Result<()> {
+    Notification::new()
+        .summary(alert.kind.title())
+        .body(&alert.message())
+        .appname("NitroSense")
+        .show()
+        .map(|_| ())
 }
 
 #[cfg(test)]
