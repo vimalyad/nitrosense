@@ -1,9 +1,15 @@
 use anyhow::{anyhow, Result};
 use eframe::egui;
+use tokio::runtime::Runtime;
+use tokio::sync::watch;
 
-use crate::sensors::{read_current_sensor_data, SensorData};
+use crate::polling::{spawn_sensor_polling, SensorSnapshot};
+use crate::sensors::SensorData;
 
 pub fn run() -> Result<()> {
+    let runtime = Runtime::new()?;
+    let sensor_receiver = spawn_sensor_polling(runtime.handle());
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([920.0, 640.0]),
         ..Default::default()
@@ -12,7 +18,13 @@ pub fn run() -> Result<()> {
     eframe::run_native(
         "NitroSense",
         options,
-        Box::new(|creation_context| Box::new(NitroSenseApp::new(creation_context))),
+        Box::new(|creation_context| {
+            Box::new(NitroSenseApp::new(
+                creation_context,
+                runtime,
+                sensor_receiver,
+            ))
+        }),
     )
     .map_err(|error| anyhow!("failed to launch NitroSense UI: {error}"))
 }
@@ -25,14 +37,24 @@ enum AppTab {
 }
 
 struct NitroSenseApp {
-    sensor_data: SensorData,
+    _runtime: Runtime,
+    sensor_receiver: watch::Receiver<SensorSnapshot>,
+    sensor_snapshot: SensorSnapshot,
     active_tab: AppTab,
 }
 
 impl NitroSenseApp {
-    fn new(_creation_context: &eframe::CreationContext<'_>) -> Self {
+    fn new(
+        _creation_context: &eframe::CreationContext<'_>,
+        runtime: Runtime,
+        sensor_receiver: watch::Receiver<SensorSnapshot>,
+    ) -> Self {
+        let sensor_snapshot = sensor_receiver.borrow().clone();
+
         Self {
-            sensor_data: read_current_sensor_data(),
+            _runtime: runtime,
+            sensor_receiver,
+            sensor_snapshot,
             active_tab: AppTab::Overview,
         }
     }
@@ -40,6 +62,8 @@ impl NitroSenseApp {
 
 impl eframe::App for NitroSenseApp {
     fn update(&mut self, context: &egui::Context, _frame: &mut eframe::Frame) {
+        self.refresh_sensor_snapshot();
+
         egui::CentralPanel::default().show(context, |ui| {
             ui.add_space(8.0);
             self.show_header(ui);
@@ -47,6 +71,7 @@ impl eframe::App for NitroSenseApp {
             self.show_power_profile(ui);
             ui.add_space(12.0);
             self.show_stats(ui);
+            self.show_polling_status(ui);
             ui.add_space(12.0);
             self.show_tabs(ui);
             ui.separator();
@@ -57,6 +82,16 @@ impl eframe::App for NitroSenseApp {
 }
 
 impl NitroSenseApp {
+    fn refresh_sensor_snapshot(&mut self) {
+        if self.sensor_receiver.has_changed().unwrap_or(false) {
+            self.sensor_snapshot = self.sensor_receiver.borrow_and_update().clone();
+        }
+    }
+
+    fn sensor_data(&self) -> &SensorData {
+        &self.sensor_snapshot.data
+    }
+
     fn show_header(&self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.heading("NitroSense");
@@ -72,7 +107,7 @@ impl NitroSenseApp {
                 ui.strong("Power Profile");
                 ui.separator();
                 ui.label(
-                    self.sensor_data
+                    self.sensor_data()
                         .active_power_profile
                         .as_deref()
                         .unwrap_or("Unavailable"),
@@ -83,7 +118,7 @@ impl NitroSenseApp {
             ui.horizontal_wrapped(|ui| {
                 for profile in ["Low Power", "Quiet", "Balanced", "Balanced+", "Performance"] {
                     let active = self
-                        .sensor_data
+                        .sensor_data()
                         .active_power_profile
                         .as_deref()
                         .map(|current| current.eq_ignore_ascii_case(profile))
@@ -102,19 +137,19 @@ impl NitroSenseApp {
                 self.stat_card(
                     ui,
                     "CPU",
-                    format_temperature(self.sensor_data.cpu_package_temp_celsius),
+                    format_temperature(self.sensor_data().cpu_package_temp_celsius),
                     "Package",
                 );
                 self.stat_card(
                     ui,
                     "NVIDIA GPU",
-                    format_temperature(self.sensor_data.nvidia_gpu_temp_celsius),
+                    format_temperature(self.sensor_data().nvidia_gpu_temp_celsius),
                     "Discrete",
                 );
                 self.stat_card(
                     ui,
                     "Intel GPU",
-                    format_temperature(self.sensor_data.intel_gpu_temp_celsius),
+                    format_temperature(self.sensor_data().intel_gpu_temp_celsius),
                     "Integrated",
                 );
                 ui.end_row();
@@ -122,19 +157,19 @@ impl NitroSenseApp {
                 self.stat_card(
                     ui,
                     "CPU Fan",
-                    format_rpm(self.sensor_data.cpu_fan_rpm),
+                    format_rpm(self.sensor_data().cpu_fan_rpm),
                     "Fan 1",
                 );
                 self.stat_card(
                     ui,
                     "GPU Fan",
-                    format_rpm(self.sensor_data.gpu_fan_rpm),
+                    format_rpm(self.sensor_data().gpu_fan_rpm),
                     "Fan 2",
                 );
                 self.stat_card(
                     ui,
                     "NVMe",
-                    format_temperature(self.sensor_data.nvme_temp_celsius),
+                    format_temperature(self.sensor_data().nvme_temp_celsius),
                     "Storage",
                 );
                 ui.end_row();
@@ -142,13 +177,13 @@ impl NitroSenseApp {
                 self.stat_card(
                     ui,
                     "Battery",
-                    format_voltage(self.sensor_data.battery_voltage),
+                    format_voltage(self.sensor_data().battery_voltage),
                     "BAT1",
                 );
                 self.stat_card(
                     ui,
                     "Profile",
-                    self.sensor_data
+                    self.sensor_data()
                         .active_power_profile
                         .clone()
                         .unwrap_or_else(|| "Unavailable".to_owned()),
@@ -157,6 +192,16 @@ impl NitroSenseApp {
                 ui.label("");
                 ui.end_row();
             });
+    }
+
+    fn show_polling_status(&self, ui: &mut egui::Ui) {
+        if let Some(error) = &self.sensor_snapshot.last_error {
+            ui.add_space(8.0);
+            ui.colored_label(
+                egui::Color32::from_rgb(180, 90, 40),
+                format!("Sensor polling issue: {error}"),
+            );
+        }
     }
 
     fn stat_card(&self, ui: &mut egui::Ui, title: &str, value: String, detail: &str) {
@@ -192,12 +237,12 @@ impl NitroSenseApp {
     fn show_overview_tab(&self, ui: &mut egui::Ui) {
         ui.heading("Overview");
         ui.add_space(8.0);
-        fan_activity_bar(ui, "CPU Fan", self.sensor_data.cpu_fan_rpm);
-        fan_activity_bar(ui, "GPU Fan", self.sensor_data.gpu_fan_rpm);
+        fan_activity_bar(ui, "CPU Fan", self.sensor_data().cpu_fan_rpm);
+        fan_activity_bar(ui, "GPU Fan", self.sensor_data().gpu_fan_rpm);
         ui.add_space(8.0);
         ui.label(format!(
             "Battery voltage: {}",
-            format_voltage(self.sensor_data.battery_voltage)
+            format_voltage(self.sensor_data().battery_voltage)
         ));
     }
 
@@ -214,11 +259,11 @@ impl NitroSenseApp {
         ui.add_space(8.0);
         ui.label(format!(
             "CPU Fan: {}",
-            format_rpm(self.sensor_data.cpu_fan_rpm)
+            format_rpm(self.sensor_data().cpu_fan_rpm)
         ));
         ui.label(format!(
             "GPU Fan: {}",
-            format_rpm(self.sensor_data.gpu_fan_rpm)
+            format_rpm(self.sensor_data().gpu_fan_rpm)
         ));
     }
 }
