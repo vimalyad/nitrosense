@@ -19,3 +19,6 @@ Tracked findings from that local analysis are kept in:
 
 To continue the analysis locally, place the official Acer package in this
 directory and keep generated extraction/decompilation output untracked.
+
+See `../docs/official-app-analysis.md` for the command-by-command local
+extraction and decompilation workflow.

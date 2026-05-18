@@ -38,6 +38,9 @@ the repo can understand why the Linux implementation works the way it does:
 - [nitrosense_info.md](nitrosense_info.md): detailed official NitroSense package
   analysis, named-pipe/service architecture, Acer WMI commands, fan payloads,
   sensor indices, CoolBoost notes, and Linux implications.
+- [docs/official-app-analysis.md](docs/official-app-analysis.md): local-only
+  commands for users who want to download Acer's package themselves and reproduce
+  the extraction/decompilation workflow.
 
 Important conclusions so far:
 
@@ -114,6 +117,7 @@ touchpoints, so validate setup on your own machine before relying on the app.
 - `src/tray.rs`: feature-gated tray integration
 - `docs/setup.md`: Fedora setup and install notes
 - `docs/handoff.md`: architecture and continuation notes
+- `docs/official-app-analysis.md`: local official-app extraction guide
 - `my_laptop.md`: target laptop facts and local hardware findings
 - `nitrosense_info.md`: official NitroSense analysis and reverse-engineering notes
 
