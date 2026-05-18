@@ -621,3 +621,28 @@ fn load_window_icon() -> Result<egui::IconData> {
         height,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn displays_profile_names_cleanly() {
+        assert_eq!(display_profile_name("low-power"), "Low Power");
+        assert_eq!(
+            display_profile_name("balanced_performance"),
+            "Balanced Performance"
+        );
+    }
+
+    #[test]
+    fn builds_tray_tooltip_from_sensor_data() {
+        let data = SensorData {
+            cpu_package_temp_celsius: Some(72.4),
+            active_power_profile: Some("balanced".to_owned()),
+            ..SensorData::default()
+        };
+
+        assert_eq!(tray_tooltip(&data), "CPU: 72 C | Profile: balanced");
+    }
+}
