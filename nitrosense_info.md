@@ -453,6 +453,11 @@ Discrete GPU temperature source:
   NVIDIA driver.
 - The local Linux scan did not expose an `i915` hwmon adapter for Intel GPU
   temperature either.
+- The Intel GPU is present at PCI `0000:00:02.0` and uses the `i915` kernel
+  driver, but `/sys/class/drm/card1/device/hwmon` does not exist.
+- `lm_sensors` does not report an Intel GPU temperature sensor on this boot.
+- Generic thermal zones such as `SEN2`, `SEN3`, `TCPU`, `TCPU_PCI`, and
+  `x86_pkg_temp` are present, but they are not labeled as iGPU sensors.
 - The app therefore reads NVIDIA/discrete GPU temperature from Acer firmware
   hwmon `temp3_input` when no native NVIDIA hwmon temperature exists.
 - If `temp3_input` is missing, the app tries Acer firmware hwmon `temp2_input`.

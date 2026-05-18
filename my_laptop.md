@@ -148,6 +148,15 @@ Linux scan result:
 - No `/sys/class/hwmon` adapter named `nvidia` was exposed during the scan.
 - No `/sys/class/hwmon` adapter named `i915` was exposed during the scan.
 - `nvidia-smi` was installed but could not communicate with the NVIDIA driver.
+- `lspci -nnk` shows the Intel GPU uses the `i915` kernel driver.
+- `/sys/class/drm/card1/device/hwmon` does not exist for the Intel GPU.
+- `/sys/class/drm/card1/device/power_state` reported `D0`, so the Intel GPU was
+  awake during the check.
+- `lm_sensors` did not report an Intel GPU temperature sensor.
+- Generic thermal zones were visible (`SEN2`, `SEN3`, `TCPU`, `TCPU_PCI`,
+  `x86_pkg_temp`), but none are labeled as Intel GPU temperature.
+- `/sys/kernel/debug/dri` may contain i915 debug data, but it requires root
+  access and is not a stable user-facing app data source.
 
 Implementation decision:
 
