@@ -11,7 +11,7 @@ NitroSense is a native Rust desktop app using `eframe`/`egui`.
 - `src/ui/widgets.rs`: reusable egui widgets such as navigation buttons, metrics, fan panels, and sliders.
 - `src/hardware/sensors.rs`: read-only `/sys` hwmon discovery and sensor reads.
 - `src/hardware/profile.rs`: platform profile reads and privileged writes through `sudo -n tee`.
-- `src/hardware/fan_control.rs`: Acer `acer-wmi` hwmon PWM discovery and write helpers.
+- `src/hardware/fan_control.rs`: Acer `acer-wmi` hwmon PWM discovery and restricted Polkit helper writes.
 - `src/services/polling.rs`: Tokio background polling task that sends `SensorSnapshot` values through a watch channel.
 - `src/services/notifications.rs`: thermal alert thresholds, cooldowns, and `notify-rust` delivery.
 - `src/services/tray.rs`: feature-gated tray integration with a no-op default backend.
@@ -52,8 +52,9 @@ sudo dnf install gtk3-devel libappindicator-gtk3-devel
 - Power profile writes require passwordless sudo for:
   `tee /sys/firmware/acpi/platform_profile`.
 - Manual fan control is AN515-58-specific and uses the Acer hwmon PWM files
-  exposed by `acer-wmi`. Writes require passwordless sudo for the current
-  `pwm1`, `pwm2`, `pwm1_enable`, and `pwm2_enable` paths.
+  exposed by `acer-wmi`. The GUI calls the same binary through
+  `pkexec --fan-helper ...`, so Polkit handles authentication and the helper
+  performs validated writes.
 
 ## Branch Flow
 

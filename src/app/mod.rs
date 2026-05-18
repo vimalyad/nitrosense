@@ -100,6 +100,16 @@ impl NitroSenseApp {
         ));
         tray_controller.set_tooltip(tray_tooltip(&sensor_snapshot.data));
 
+        let fan_control_status = FanControlStatus::detect();
+        let fan_control_message = if fan_control_status.can_control() {
+            match fan_control::authorize_helper() {
+                Ok(()) => Some("Fan control authorized for this session.".to_owned()),
+                Err(error) => Some(format!("Fan control authorization not completed: {error}")),
+            }
+        } else {
+            None
+        };
+
         Self {
             _runtime: runtime,
             sensor_receiver,
@@ -108,12 +118,12 @@ impl NitroSenseApp {
             graph_visibility: GraphVisibility::default(),
             profile_choices,
             profile_status: None,
-            fan_control_status: FanControlStatus::detect(),
+            fan_control_status,
             cpu_fan_percent: 50,
             gpu_fan_percent: 50,
             pending_fan_apply_at: None,
             last_fan_status_refresh: Instant::now(),
-            fan_control_message: None,
+            fan_control_message,
             app_config: AppConfig::default(),
             thermal_alerts: ThermalAlertState::default(),
             notification_status: None,

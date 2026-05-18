@@ -1,7 +1,8 @@
+use std::ffi::OsString;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 const HWMON_ROOT: &str = "/sys/class/hwmon";
 
@@ -16,6 +17,21 @@ impl FanId {
         match self {
             Self::Cpu => 1,
             Self::Gpu => 2,
+        }
+    }
+
+    fn helper_name(self) -> &'static str {
+        match self {
+            Self::Cpu => "cpu",
+            Self::Gpu => "gpu",
+        }
+    }
+
+    fn from_helper_name(value: &str) -> Option<Self> {
+        match value {
+            "cpu" => Some(Self::Cpu),
+            "gpu" => Some(Self::Gpu),
+            _ => None,
         }
     }
 }
@@ -42,23 +58,94 @@ impl FanControlStatus {
 }
 
 pub fn set_manual_speed(fan: FanId, percent: u8) -> io::Result<()> {
+    let percent = percent.min(100).to_string();
+    run_pkexec_helper(&["set-manual", fan.helper_name(), &percent])
+}
+
+pub fn set_auto_mode() -> io::Result<()> {
+    run_pkexec_helper(&["set-auto"])
+}
+
+pub fn authorize_helper() -> io::Result<()> {
+    run_pkexec_helper(&["authorize"])
+}
+
+pub fn handle_helper_args(args: impl IntoIterator<Item = OsString>) -> io::Result<bool> {
+    let mut args = args.into_iter();
+    let _program = args.next();
+
+    if args.next().as_deref() != Some(std::ffi::OsStr::new("--fan-helper")) {
+        return Ok(false);
+    }
+
+    let Some(command) = args.next().and_then(|value| value.into_string().ok()) else {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "missing fan helper command",
+        ));
+    };
+
+    match command.as_str() {
+        "authorize" => {
+            discover_acer_hwmon(HWMON_ROOT)?.ok_or_else(|| {
+                io::Error::new(io::ErrorKind::NotFound, "acer hwmon adapter not found")
+            })?;
+        }
+        "set-auto" => set_auto_mode_direct()?,
+        "set-manual" => {
+            let Some(fan) = args
+                .next()
+                .and_then(|value| value.into_string().ok())
+                .and_then(|value| FanId::from_helper_name(&value))
+            else {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "expected fan helper name cpu or gpu",
+                ));
+            };
+
+            let Some(percent) = args
+                .next()
+                .and_then(|value| value.into_string().ok())
+                .and_then(|value| value.parse::<u8>().ok())
+            else {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "expected fan percent from 0 to 100",
+                ));
+            };
+
+            set_manual_speed_direct(fan, percent)?;
+        }
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("unknown fan helper command: {command}"),
+            ));
+        }
+    }
+
+    Ok(true)
+}
+
+fn set_manual_speed_direct(fan: FanId, percent: u8) -> io::Result<()> {
     let hwmon_path = discover_acer_hwmon(HWMON_ROOT)?
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "acer hwmon adapter not found"))?;
 
     let index = fan.pwm_index();
-    write_hwmon_value(hwmon_path.join(format!("pwm{index}_enable")), 1)?;
-    write_hwmon_value(
+    write_direct_hwmon_value(hwmon_path.join(format!("pwm{index}_enable")), 1)?;
+    write_direct_hwmon_value(
         hwmon_path.join(format!("pwm{index}")),
         percent_to_pwm(percent),
     )
 }
 
-pub fn set_auto_mode() -> io::Result<()> {
+fn set_auto_mode_direct() -> io::Result<()> {
     let hwmon_path = discover_acer_hwmon(HWMON_ROOT)?
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "acer hwmon adapter not found"))?;
 
-    write_hwmon_value(hwmon_path.join("pwm1_enable"), 2)?;
-    write_hwmon_value(hwmon_path.join("pwm2_enable"), 2)
+    write_direct_hwmon_value(hwmon_path.join("pwm1_enable"), 2)?;
+    write_direct_hwmon_value(hwmon_path.join("pwm2_enable"), 2)
 }
 
 fn detect_from(root: impl AsRef<Path>) -> FanControlStatus {
@@ -123,37 +210,30 @@ fn read_u8_file(path: impl AsRef<Path>) -> Option<u8> {
     fs::read_to_string(path).ok()?.trim().parse().ok()
 }
 
-fn write_hwmon_value(path: impl AsRef<Path>, value: u8) -> io::Result<()> {
-    let path = path.as_ref();
-    let mut child = Command::new("sudo")
-        .arg("-n")
-        .arg("tee")
-        .arg(path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()?;
+fn run_pkexec_helper(args: &[&str]) -> io::Result<()> {
+    let executable = std::env::current_exe()?;
+    let mut command = Command::new("pkexec");
+    command.arg(executable).arg("--fan-helper").args(args);
 
-    if let Some(mut stdin) = child.stdin.take() {
-        use std::io::Write;
-        writeln!(stdin, "{value}")?;
-    }
-
-    let output = child.wait_with_output()?;
+    let output = command.output()?;
 
     if output.status.success() {
         Ok(())
     } else {
-        let error = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
         Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            if error.is_empty() {
-                format!("failed to write {} with sudo tee", path.display())
+            if stderr.is_empty() {
+                "fan helper authorization failed".to_owned()
             } else {
-                error
+                stderr
             },
         ))
     }
+}
+
+fn write_direct_hwmon_value(path: impl AsRef<Path>, value: u8) -> io::Result<()> {
+    fs::write(path, format!("{value}\n"))
 }
 
 fn percent_to_pwm(percent: u8) -> u8 {

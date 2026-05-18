@@ -105,17 +105,17 @@ Power profile switching writes through:
 sudo -n tee /sys/firmware/acpi/platform_profile
 ```
 
-Manual fan control writes through the Acer hwmon adapter exposed by `acer-wmi`:
+Manual fan control writes through a restricted Polkit helper mode in the same
+binary:
 
 ```bash
-sudo -n tee /sys/class/hwmon/hwmon*/pwm1_enable
-sudo -n tee /sys/class/hwmon/hwmon*/pwm1
-sudo -n tee /sys/class/hwmon/hwmon*/pwm2_enable
-sudo -n tee /sys/class/hwmon/hwmon*/pwm2
+pkexec nitrosense --fan-helper set-manual cpu 50
+pkexec nitrosense --fan-helper set-manual gpu 50
+pkexec nitrosense --fan-helper set-auto
 ```
 
-The app uses non-interactive `sudo -n`; configure the exact NOPASSWD sudoers
-rules from [docs/setup.md](docs/setup.md) before using fan control from the GUI.
+The GUI never reads or stores your password. Polkit shows the system
+authentication prompt and the helper only accepts validated fan-control commands.
 
 Use these controls carefully. Fan control and power profile changes are hardware
 touchpoints, so validate setup on your own machine before relying on the app.

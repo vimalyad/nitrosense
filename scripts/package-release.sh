@@ -52,8 +52,8 @@ nitrosense
 
 ## Runtime Notes
 
-Fan/profile writes may require passwordless sudo setup for the exact sysfs paths.
-See `docs/setup.md`.
+Fan writes use Polkit through `pkexec nitrosense --fan-helper ...`; profile
+writes still use sudo. See `docs/setup.md`.
 
 This is alpha hardware-control software. Use only if your laptop exposes the
 expected Acer hwmon PWM controls.

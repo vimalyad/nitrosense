@@ -43,23 +43,24 @@ cat /sys/class/hwmon/hwmon*/name
 ls /sys/class/hwmon/hwmon*/pwm*
 ```
 
-The app writes `pwm1`, `pwm2`, `pwm1_enable`, and `pwm2_enable` through
-`sudo -n tee`. The `-n` flag is intentional: the GUI does not open a password
-prompt. If sudoers is not configured, fan updates fail with
-`sudo: a password is required`.
+The app writes `pwm1`, `pwm2`, `pwm1_enable`, and `pwm2_enable` through a
+restricted helper mode in the same binary. The normal GUI calls that helper with
+`pkexec`, so KDE/GNOME/Polkit shows the system password prompt and the app never
+reads or stores your password.
 
-Because the exact `hwmonN` index can change across boots, create a sudoers rule
-after replacing `hwmon5` with the current Acer hwmon directory:
+Manual helper examples:
 
 ```bash
-echo "vimal2907 ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/class/hwmon/hwmon5/pwm1, /usr/bin/tee /sys/class/hwmon/hwmon5/pwm1_enable, /usr/bin/tee /sys/class/hwmon/hwmon5/pwm2, /usr/bin/tee /sys/class/hwmon/hwmon5/pwm2_enable" \
-  | sudo tee /etc/sudoers.d/nitrosense-fans
+pkexec nitrosense --fan-helper authorize
+pkexec nitrosense --fan-helper set-manual cpu 50
+pkexec nitrosense --fan-helper set-manual gpu 50
+pkexec nitrosense --fan-helper set-auto
 ```
 
-Validate the rule:
+Install `polkit`/`pkexec` if your distribution does not include it:
 
 ```bash
-printf '1\n' | sudo -n tee /sys/class/hwmon/hwmon5/pwm1_enable
+sudo dnf install polkit
 ```
 
 ## Desktop Entry
