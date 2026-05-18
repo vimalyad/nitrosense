@@ -8,6 +8,12 @@ who wants to study or extend it.
 The app is inspired by Acer NitroSense on Windows and is currently targeted at
 the Acer Nitro AN515-58 on Fedora KDE Plasma Wayland.
 
+This repository also documents the exploration behind the implementation. The
+tracked notes summarize what was learned from Acer's official NitroSense package,
+the AN515-58 plug-in files, decompiled managed code, and the Linux `acer-wmi`
+interfaces available on the target laptop. The official Acer package itself is
+not tracked.
+
 ## Features
 
 - Native `egui`/`eframe` desktop UI
@@ -21,6 +27,28 @@ the Acer Nitro AN515-58 on Fedora KDE Plasma Wayland.
 - Thermal desktop notifications
 - Feature-gated system tray support
 - Desktop entry and setup documentation
+
+## Reverse Engineering Notes
+
+The project keeps portable findings in tracked Markdown files so someone reading
+the repo can understand why the Linux implementation works the way it does:
+
+- [my_laptop.md](my_laptop.md): exact AN515-58 identity, official plug-in facts,
+  Linux kernel capability scan, and current hardware-control decisions.
+- [nitrosense_info.md](nitrosense_info.md): detailed official NitroSense package
+  analysis, named-pipe/service architecture, Acer WMI commands, fan payloads,
+  sensor indices, CoolBoost notes, and Linux implications.
+
+Important conclusions so far:
+
+- Acer's Windows UI does not directly write raw EC registers; it talks to a
+  service, and that service calls Acer WMI methods under `ROOT\WMI`.
+- The AN515-58 official plug-in supports CPU and GPU fans, but not a separate
+  system fan.
+- On Linux, this laptop exposes fan RPM and PWM control through the kernel
+  `acer-wmi` hwmon adapter, so this app uses that native interface first.
+- Raw EC writes are intentionally avoided unless a safe model-specific path is
+  verified later.
 
 ## Build
 
@@ -86,6 +114,8 @@ touchpoints, so validate setup on your own machine before relying on the app.
 - `src/tray.rs`: feature-gated tray integration
 - `docs/setup.md`: Fedora setup and install notes
 - `docs/handoff.md`: architecture and continuation notes
+- `my_laptop.md`: target laptop facts and local hardware findings
+- `nitrosense_info.md`: official NitroSense analysis and reverse-engineering notes
 
 ## Status
 
