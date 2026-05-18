@@ -65,16 +65,12 @@ sudo dnf install polkit
 
 ## Desktop Entry
 
-Install the binary and icon:
+Install the binary, launcher, and icons:
 
 ```bash
-cargo build --release
-install -Dm755 target/release/nitrosense ~/.local/bin/nitrosense
-cp -R assets/icons/hicolor/. ~/.local/share/icons/hicolor/
-test -f ~/.local/share/icons/hicolor/index.theme || cp /usr/share/icons/hicolor/index.theme ~/.local/share/icons/hicolor/index.theme
-install -Dm644 packaging/nitrosense.desktop ~/.local/share/applications/nitrosense.desktop
-update-desktop-database ~/.local/share/applications
-gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor 2>/dev/null || true
-xdg-icon-resource forceupdate --theme hicolor --mode user
-kbuildsycoca6 --noincremental 2>/dev/null || true
+scripts/install-local.sh release
 ```
+
+The local installer writes absolute `Exec=` and `Icon=` paths into the installed
+desktop entry. This avoids KDE/Plasma showing a generic file icon when theme
+icon-name lookup caches are stale.

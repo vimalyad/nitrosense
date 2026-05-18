@@ -74,6 +74,12 @@ Run:
 ./target/release/nitrosense
 ```
 
+Install for the current user:
+
+```bash
+scripts/install-local.sh release
+```
+
 Create a release archive:
 
 ```bash

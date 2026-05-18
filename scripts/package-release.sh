@@ -41,7 +41,12 @@ From this extracted archive:
 install -Dm755 bin/nitrosense ~/.local/bin/nitrosense
 cp -R share/icons/hicolor/. ~/.local/share/icons/hicolor/
 test -f ~/.local/share/icons/hicolor/index.theme || cp /usr/share/icons/hicolor/index.theme ~/.local/share/icons/hicolor/index.theme
-install -Dm644 share/applications/nitrosense.desktop ~/.local/share/applications/nitrosense.desktop
+desktop-file-install \
+  --dir="$HOME/.local/share/applications" \
+  --set-key=Exec \
+  --set-value="$HOME/.local/bin/nitrosense" \
+  --set-icon="$HOME/.local/share/icons/hicolor/256x256/apps/nitrosense.png" \
+  share/applications/nitrosense.desktop
 update-desktop-database ~/.local/share/applications
 gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor 2>/dev/null || true
 xdg-icon-resource forceupdate --theme hicolor --mode user
