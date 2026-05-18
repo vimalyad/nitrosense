@@ -3,6 +3,7 @@ use eframe::egui;
 use tokio::runtime::Runtime;
 use tokio::sync::watch;
 
+use crate::fan_control::{self, FanControlStatus, FanId};
 use crate::graph::{show_graph, GraphHistory, GraphVisibility};
 use crate::polling::{spawn_sensor_polling, SensorSnapshot};
 use crate::profile::{self, PowerProfile};
@@ -46,6 +47,10 @@ struct NitroSenseApp {
     graph_visibility: GraphVisibility,
     profile_choices: Vec<PowerProfile>,
     profile_status: Option<String>,
+    fan_control_status: FanControlStatus,
+    cpu_fan_percent: u8,
+    gpu_fan_percent: u8,
+    fan_control_message: Option<String>,
     active_tab: AppTab,
 }
 
@@ -68,6 +73,10 @@ impl NitroSenseApp {
             graph_visibility: GraphVisibility::default(),
             profile_choices: profile::read_profile_choices().unwrap_or_default(),
             profile_status: None,
+            fan_control_status: FanControlStatus::detect(),
+            cpu_fan_percent: 50,
+            gpu_fan_percent: 50,
+            fan_control_message: None,
             active_tab: AppTab::Overview,
         }
     }
@@ -320,19 +329,87 @@ impl NitroSenseApp {
         show_graph(ui, &self.graph_history, &self.graph_visibility);
     }
 
-    fn show_fan_control_tab(&self, ui: &mut egui::Ui) {
+    fn show_fan_control_tab(&mut self, ui: &mut egui::Ui) {
         ui.heading("Fan Control");
         ui.add_space(8.0);
-        ui.label("Manual fan controls will be enabled in the NBFC fan control phase.");
+
+        if !self.fan_control_status.nbfc_available {
+            ui.colored_label(
+                egui::Color32::from_rgb(180, 90, 40),
+                "NBFC command not found.",
+            );
+        }
+
+        if !self.fan_control_status.service_available {
+            ui.colored_label(
+                egui::Color32::from_rgb(180, 90, 40),
+                "nbfc_service is not active.",
+            );
+        }
+
         ui.add_space(8.0);
-        ui.label(format!(
-            "CPU Fan: {}",
-            format_rpm(self.sensor_data().cpu_fan_rpm)
-        ));
-        ui.label(format!(
-            "GPU Fan: {}",
-            format_rpm(self.sensor_data().gpu_fan_rpm)
-        ));
+        let cpu_fan_rpm = self.sensor_data().cpu_fan_rpm;
+        let gpu_fan_rpm = self.sensor_data().gpu_fan_rpm;
+
+        fan_slider_row(ui, "CPU Fan", &mut self.cpu_fan_percent, cpu_fan_rpm);
+        fan_slider_row(ui, "GPU Fan", &mut self.gpu_fan_percent, gpu_fan_rpm);
+
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
+            let controls_enabled =
+                self.fan_control_status.nbfc_available && self.fan_control_status.service_available;
+
+            if ui
+                .add_enabled(controls_enabled, egui::Button::new("Apply"))
+                .clicked()
+            {
+                self.apply_manual_fan_speeds();
+            }
+
+            if ui
+                .add_enabled(
+                    self.fan_control_status.nbfc_available,
+                    egui::Button::new("Auto"),
+                )
+                .clicked()
+            {
+                self.restore_auto_fan_control();
+            }
+
+            if ui.button("Refresh Status").clicked() {
+                self.fan_control_status = FanControlStatus::detect();
+                self.fan_control_message = Some("Fan control status refreshed.".to_owned());
+            }
+        });
+
+        if let Some(message) = &self.fan_control_message {
+            ui.add_space(8.0);
+            ui.label(message);
+        }
+    }
+
+    fn apply_manual_fan_speeds(&mut self) {
+        let cpu_result = fan_control::set_manual_speed(FanId::Cpu, self.cpu_fan_percent);
+        let gpu_result = fan_control::set_manual_speed(FanId::Gpu, self.gpu_fan_percent);
+
+        self.fan_control_message = match (cpu_result, gpu_result) {
+            (Ok(()), Ok(())) => Some(format!(
+                "Applied CPU {}% and GPU {}%.",
+                self.cpu_fan_percent, self.gpu_fan_percent
+            )),
+            (Err(cpu_error), Ok(())) => Some(format!("CPU fan update failed: {cpu_error}")),
+            (Ok(()), Err(gpu_error)) => Some(format!("GPU fan update failed: {gpu_error}")),
+            (Err(cpu_error), Err(gpu_error)) => Some(format!(
+                "CPU fan update failed: {cpu_error}; GPU fan update failed: {gpu_error}"
+            )),
+        };
+    }
+
+    fn restore_auto_fan_control(&mut self) {
+        self.fan_control_message = match fan_control::set_auto_mode() {
+            Ok(()) => Some("Restored automatic fan control.".to_owned()),
+            Err(error) => Some(format!("Could not restore automatic fan control: {error}")),
+        };
     }
 }
 
@@ -347,6 +424,20 @@ fn fan_activity_bar(ui: &mut egui::Ui, label: &str, rpm: Option<u32>) {
             .desired_width(360.0)
             .text(text),
     );
+}
+
+fn fan_slider_row(ui: &mut egui::Ui, label: &str, percent: &mut u8, rpm: Option<u32>) {
+    ui.horizontal(|ui| {
+        ui.set_min_height(32.0);
+        ui.label(label);
+
+        let mut value = *percent as f32;
+        ui.add(egui::Slider::new(&mut value, 0.0..=100.0).show_value(false));
+        *percent = value.round().clamp(0.0, 100.0) as u8;
+
+        ui.label(format!("{}%", *percent));
+        ui.label(format_rpm(rpm));
+    });
 }
 
 fn format_temperature(value: Option<f32>) -> String {
