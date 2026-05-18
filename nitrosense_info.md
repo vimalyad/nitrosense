@@ -446,6 +446,19 @@ Observed Acer hwmon files and values:
 - `pwm2_enable`: `1`
 - `pwm2`: `255`
 
+Discrete GPU temperature source:
+
+- The local Linux scan did not expose a `nvidia` hwmon adapter.
+- `nvidia-smi` was available but reported that it could not communicate with the
+  NVIDIA driver.
+- The local Linux scan did not expose an `i915` hwmon adapter for Intel GPU
+  temperature either.
+- The app therefore reads NVIDIA/discrete GPU temperature from Acer firmware
+  hwmon `temp3_input` when no native NVIDIA hwmon temperature exists.
+- If `temp3_input` is missing, the app tries Acer firmware hwmon `temp2_input`.
+- Intel GPU temperature remains unavailable until Linux exposes a real Intel GPU
+  temperature source.
+
 Practical implementation decision:
 
 - Use the Linux `acer-wmi` hwmon PWM files as the first native fan-control

@@ -136,6 +136,30 @@ Observed values during scan:
 - `pwm2_enable`: `1`
 - `pwm2`: `255`
 
+## GPU Temperature Availability on Linux
+
+PCI devices observed:
+
+- Intel Alder Lake-P GT1 UHD Graphics
+- NVIDIA GA104 RTX 3070 Ti Laptop GPU
+
+Linux scan result:
+
+- No `/sys/class/hwmon` adapter named `nvidia` was exposed during the scan.
+- No `/sys/class/hwmon` adapter named `i915` was exposed during the scan.
+- `nvidia-smi` was installed but could not communicate with the NVIDIA driver.
+
+Implementation decision:
+
+- Use native `nvidia` hwmon temperature first if the NVIDIA driver exposes it in
+  the future.
+- Fall back to Acer firmware hwmon `temp3_input` for the discrete NVIDIA GPU
+  temperature on this AN515-58.
+- Fall back to Acer firmware hwmon `temp2_input` only if `temp3_input` is
+  missing.
+- Keep Intel GPU temperature as `Unavailable` unless the Linux kernel exposes a
+  real Intel GPU temperature source such as an `i915` hwmon adapter.
+
 ## Current Linux Implementation Decision
 
 - Use `acer-wmi` hwmon PWM as the first fan-control backend.

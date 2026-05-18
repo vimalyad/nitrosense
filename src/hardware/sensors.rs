@@ -41,7 +41,12 @@ impl HwmonDevices {
             nvidia_gpu_temp_celsius: self
                 .nvidia
                 .as_deref()
-                .and_then(|path| read_temp_celsius(path, 1)),
+                .and_then(|path| read_temp_celsius(path, 1))
+                .or_else(|| {
+                    self.acer
+                        .as_deref()
+                        .and_then(read_acer_discrete_gpu_temp_celsius)
+                }),
             intel_gpu_temp_celsius: self
                 .intel_gpu
                 .as_deref()
@@ -124,6 +129,10 @@ fn classify_hwmon_adapter(name: &str) -> Option<HwmonAdapter> {
 fn read_cpu_package_temp_celsius(hwmon_path: &Path) -> Option<f32> {
     find_temp_input_by_label(hwmon_path, "package id 0")
         .or_else(|| read_temp_celsius(hwmon_path, 1))
+}
+
+fn read_acer_discrete_gpu_temp_celsius(hwmon_path: &Path) -> Option<f32> {
+    read_temp_celsius(hwmon_path, 3).or_else(|| read_temp_celsius(hwmon_path, 2))
 }
 
 fn find_temp_input_by_label(hwmon_path: &Path, expected_label: &str) -> Option<f32> {
@@ -229,6 +238,48 @@ mod tests {
         fs::write(root.join("temp2_input"), "72000\n").unwrap();
 
         assert_eq!(read_cpu_package_temp_celsius(&root), Some(72.0));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reads_acer_discrete_gpu_temperature_from_firmware_adapter() {
+        let root = unique_test_dir("acer-gpu-temp");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("temp2_input"), "46000\n").unwrap();
+        fs::write(root.join("temp3_input"), "48000\n").unwrap();
+
+        assert_eq!(read_acer_discrete_gpu_temp_celsius(&root), Some(48.0));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn falls_back_to_acer_second_temperature_for_discrete_gpu() {
+        let root = unique_test_dir("acer-gpu-temp-fallback");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("temp2_input"), "46000\n").unwrap();
+
+        assert_eq!(read_acer_discrete_gpu_temp_celsius(&root), Some(46.0));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn sensor_snapshot_uses_acer_temperature_for_discrete_gpu_when_nvidia_hwmon_is_missing() {
+        let root = unique_test_dir("snapshot-acer-gpu-temp");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("temp3_input"), "48000\n").unwrap();
+
+        let devices = HwmonDevices {
+            acer: Some(root.clone()),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            devices.read_sensor_data().nvidia_gpu_temp_celsius,
+            Some(48.0)
+        );
 
         fs::remove_dir_all(root).unwrap();
     }
