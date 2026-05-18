@@ -57,19 +57,18 @@ impl NitroSenseApp {
         nav_button(ui, &mut self.active_tab, AppTab::Graph, "Temperature");
         nav_button(ui, &mut self.active_tab, AppTab::FanControl, "Fan Control");
 
-        ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-            ui.add_space(16.0);
-            ui.label(
-                egui::RichText::new(
-                    self.sensor_data()
-                        .active_power_profile
-                        .as_deref()
-                        .unwrap_or("profile unavailable"),
-                )
-                .color(egui::Color32::from_rgb(190, 196, 202)),
-            );
-            ui.label(egui::RichText::new("Current profile").small().weak());
-        });
+        let footer_gap = (ui.available_height() - 52.0).max(16.0);
+        ui.add_space(footer_gap);
+        ui.label(egui::RichText::new("Current profile").small().weak());
+        ui.label(
+            egui::RichText::new(
+                self.sensor_data()
+                    .active_power_profile
+                    .as_deref()
+                    .unwrap_or("profile unavailable"),
+            )
+            .color(egui::Color32::from_rgb(190, 196, 202)),
+        );
     }
 
     pub(super) fn show_status_strip(&mut self, ui: &mut egui::Ui) {

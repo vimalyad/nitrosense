@@ -131,21 +131,27 @@ impl eframe::App for NitroSenseApp {
             .resizable(false)
             .exact_width(176.0)
             .frame(egui::Frame::none().fill(sidebar_color()))
-            .show(context, |ui| self.show_navigation(ui));
+            .show(context, |ui| {
+                ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+                    self.show_navigation(ui);
+                });
+            });
 
         egui::CentralPanel::default()
             .frame(egui::Frame::none().fill(app_background_color()))
             .show(context, |ui| {
-                ui.add_space(14.0);
-                self.show_header(ui);
-                ui.add_space(14.0);
-                self.show_status_strip(ui);
-                ui.add_space(14.0);
-                self.show_polling_status(ui);
-                self.show_notification_status(ui);
-                self.show_tray_status(ui);
-                ui.add_space(8.0);
-                self.show_active_tab(ui);
+                ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+                    ui.add_space(14.0);
+                    self.show_header(ui);
+                    ui.add_space(14.0);
+                    self.show_status_strip(ui);
+                    ui.add_space(14.0);
+                    self.show_polling_status(ui);
+                    self.show_notification_status(ui);
+                    self.show_tray_status(ui);
+                    ui.add_space(8.0);
+                    self.show_active_tab(ui);
+                });
             });
     }
 }
