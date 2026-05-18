@@ -14,6 +14,7 @@ pub fn state_for_cpu_temp(cpu_temp_celsius: Option<f32>) -> TrayTemperatureState
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(not(feature = "tray"), allow(dead_code))]
 pub enum TrayAction {
     ShowWindow,
     Quit,
