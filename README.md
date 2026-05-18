@@ -118,9 +118,10 @@ pkexec nitrosense --fan-helper set-auto
 The GUI never reads or stores your password. Polkit shows the system
 authentication prompt and the helper only accepts validated fan-control commands.
 
-Launcher icons are installed from `assets/icons/hicolor/`, which contains
-standard hicolor sizes generated from `assets/icon.png`. Do not install the
-large source PNG directly into a fixed-size hicolor directory.
+Launcher icons are installed from `assets/icons/hicolor/`, which contains the
+fixed app sizes declared by Fedora's hicolor theme, including `22x22`, `36x36`,
+`72x72`, `96x96`, `192x192`, and HiDPI `@2` variants. Do not install the large
+source PNG directly into a fixed-size hicolor directory.
 
 Use these controls carefully. Fan control and power profile changes are hardware
 touchpoints, so validate setup on your own machine before relying on the app.
