@@ -33,13 +33,23 @@ echo "vimal2907 ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/firmware/acpi/platform_pro
   | sudo tee /etc/sudoers.d/nitrosense
 ```
 
-## NBFC Fan Control
+## Acer WMI Fan Control
 
-Manual fan control requires NBFC and its service:
+On the target AN515-58, Linux exposes Acer fan control through the `acer-wmi`
+hwmon adapter. Verify it is present:
 
 ```bash
-sudo systemctl enable --now nbfc_service
-sudo nbfc config --set "Acer Nitro AN515-58"
+cat /sys/class/hwmon/hwmon*/name
+ls /sys/class/hwmon/hwmon*/pwm*
+```
+
+The app writes `pwm1`, `pwm2`, `pwm1_enable`, and `pwm2_enable` through
+`sudo -n tee`. Because the exact `hwmonN` index can change across boots, create
+a sudoers rule after replacing `hwmon5` with the current Acer hwmon directory:
+
+```bash
+echo "vimal2907 ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/class/hwmon/hwmon5/pwm1, /usr/bin/tee /sys/class/hwmon/hwmon5/pwm1_enable, /usr/bin/tee /sys/class/hwmon/hwmon5/pwm2, /usr/bin/tee /sys/class/hwmon/hwmon5/pwm2_enable" \
+  | sudo tee /etc/sudoers.d/nitrosense-fans
 ```
 
 ## Desktop Entry

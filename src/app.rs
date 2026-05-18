@@ -446,19 +446,33 @@ impl NitroSenseApp {
         ui.heading("Fan Control");
         ui.add_space(8.0);
 
-        if !self.fan_control_status.nbfc_available {
+        if let Some(path) = &self.fan_control_status.acer_hwmon_path {
+            ui.label(format!("Acer hwmon: {}", path.display()));
+        } else {
             ui.colored_label(
                 egui::Color32::from_rgb(180, 90, 40),
-                "NBFC command not found.",
+                "Acer hwmon adapter not found.",
             );
         }
 
-        if !self.fan_control_status.service_available {
+        if !self.fan_control_status.can_control() {
             ui.colored_label(
                 egui::Color32::from_rgb(180, 90, 40),
-                "nbfc_service is not active.",
+                "PWM controls are not available for both fans.",
             );
         }
+
+        ui.label(format!(
+            "CPU PWM: {} | GPU PWM: {}",
+            format_pwm_state(
+                self.fan_control_status.cpu_pwm,
+                self.fan_control_status.cpu_pwm_enable
+            ),
+            format_pwm_state(
+                self.fan_control_status.gpu_pwm,
+                self.fan_control_status.gpu_pwm_enable
+            )
+        ));
 
         ui.add_space(8.0);
         let cpu_fan_rpm = self.sensor_data().cpu_fan_rpm;
@@ -469,8 +483,7 @@ impl NitroSenseApp {
 
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            let controls_enabled =
-                self.fan_control_status.nbfc_available && self.fan_control_status.service_available;
+            let controls_enabled = self.fan_control_status.can_control();
 
             if ui
                 .add_enabled(controls_enabled, egui::Button::new("Apply"))
@@ -480,10 +493,7 @@ impl NitroSenseApp {
             }
 
             if ui
-                .add_enabled(
-                    self.fan_control_status.nbfc_available,
-                    egui::Button::new("Auto"),
-                )
+                .add_enabled(controls_enabled, egui::Button::new("Auto"))
                 .clicked()
             {
                 self.restore_auto_fan_control();
@@ -523,6 +533,15 @@ impl NitroSenseApp {
             Ok(()) => Some("Restored automatic fan control.".to_owned()),
             Err(error) => Some(format!("Could not restore automatic fan control: {error}")),
         };
+    }
+}
+
+fn format_pwm_state(pwm: Option<u8>, enable: Option<u8>) -> String {
+    match (pwm, enable) {
+        (Some(pwm), Some(enable)) => format!("{pwm}/255, mode {enable}"),
+        (Some(pwm), None) => format!("{pwm}/255"),
+        (None, Some(enable)) => format!("mode {enable}"),
+        (None, None) => "Unavailable".to_owned(),
     }
 }
 
@@ -642,5 +661,11 @@ mod tests {
         };
 
         assert_eq!(tray_tooltip(&data), "CPU: 72 C | Profile: balanced");
+    }
+
+    #[test]
+    fn formats_pwm_state() {
+        assert_eq!(format_pwm_state(Some(128), Some(1)), "128/255, mode 1");
+        assert_eq!(format_pwm_state(None, None), "Unavailable");
     }
 }

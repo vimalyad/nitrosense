@@ -17,7 +17,7 @@ the Acer Nitro AN515-58 on Fedora KDE Plasma Wayland.
 - One-second background polling with Tokio
 - Rolling in-memory graph using `egui_plot`
 - Platform power profile switching
-- NBFC-based manual fan control
+- Acer `acer-wmi` hwmon PWM fan control for the AN515-58
 - Thermal desktop notifications
 - Feature-gated system tray support
 - Desktop entry and setup documentation
@@ -62,12 +62,13 @@ Power profile switching writes through:
 sudo -n tee /sys/firmware/acpi/platform_profile
 ```
 
-Manual fan control uses NBFC:
+Manual fan control writes through the Acer hwmon adapter exposed by `acer-wmi`:
 
 ```bash
-nbfc set -f 0 -s <percent>
-nbfc set -f 1 -s <percent>
-nbfc set --auto
+sudo -n tee /sys/class/hwmon/hwmon*/pwm1_enable
+sudo -n tee /sys/class/hwmon/hwmon*/pwm1
+sudo -n tee /sys/class/hwmon/hwmon*/pwm2_enable
+sudo -n tee /sys/class/hwmon/hwmon*/pwm2
 ```
 
 Use these controls carefully. Fan control and power profile changes are hardware
@@ -79,7 +80,7 @@ touchpoints, so validate setup on your own machine before relying on the app.
 - `src/sensors.rs`: `/sys` sensor discovery and reads
 - `src/polling.rs`: background sensor polling
 - `src/profile.rs`: platform profile reads/writes
-- `src/fan_control.rs`: NBFC command wrappers
+- `src/fan_control.rs`: Acer hwmon PWM fan-control backend
 - `src/graph.rs`: rolling graph history and rendering
 - `src/notifications.rs`: thermal alerts and desktop notifications
 - `src/tray.rs`: feature-gated tray integration

@@ -395,3 +395,66 @@ On Linux, the closest robust equivalent would be one of:
 1. Find whether the same WMI methods are exposed through Linux `wmi`/`acer-wmi`/ACPI interfaces.
 2. Add a Linux backend that mirrors these payload encodings through an available Acer WMI bridge if one exists.
 3. Only fall back to direct EC writes if WMI/ACPI methods are unavailable and model support is verified.
+
+## Local AN515-58 Linux Capability Scan
+
+Target machine observed locally:
+
+- Vendor: `Acer`
+- Product: `Nitro AN515-58`
+- Family: `Nitro 5`
+- BIOS version: `V2.14`
+
+Loaded relevant kernel modules:
+
+- `acer_wmi`
+- `wmi_bmof`
+- `acpi_ec`
+- `platform_profile`
+- `nvidia_wmi_ec_backlight`
+
+Platform profile support:
+
+- Current profile during scan: `performance`
+- Available choices: `low-power quiet balanced balanced-performance performance`
+
+`acer_wmi` module parameters visible through `modinfo`:
+
+- `ec_raw_mode=N`
+- `cycle_gaming_thermal_profile=Y`
+- `predator_v4=N`
+- `force_series=0`
+- `force_caps=-1`
+
+Important finding:
+
+- Linux already exposes an Acer hwmon adapter for this laptop under
+  `/sys/devices/platform/acer-wmi/hwmon/hwmon5` during the scan.
+- The dynamic `/sys/class/hwmon/hwmon*` number can change between boots, so the
+  app must discover the adapter by reading `name=acer`.
+
+Observed Acer hwmon files and values:
+
+- `name`: `acer`
+- `fan1_input`: around `6521` to `7500`
+- `fan2_input`: around `6382` to `7500`
+- `temp1_input`: around `91000`
+- `temp2_input`: around `48000`
+- `temp3_input`: around `49000` to `50000`
+- `pwm1_enable`: `1`
+- `pwm1`: `255`
+- `pwm2_enable`: `1`
+- `pwm2`: `255`
+
+Practical implementation decision:
+
+- Use the Linux `acer-wmi` hwmon PWM files as the first native fan-control
+  backend for this custom AN515-58 app.
+- Map UI percentage `0..100` to Linux PWM `0..255`.
+- Set manual mode by writing `pwmN_enable=1`, then writing `pwmN`.
+- Try restoring automatic mode through the standard hwmon convention
+  `pwmN_enable=2`; if the driver rejects it, the app should report that error
+  and the user can use platform profiles while we investigate the Acer WMI method
+  bridge further.
+- Avoid raw EC writes for now because the official Windows app also uses a
+  higher-level Acer WMI/driver interface rather than direct UI-side EC access.
