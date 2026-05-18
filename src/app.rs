@@ -17,7 +17,9 @@ pub fn run() -> Result<()> {
     let sensor_receiver = spawn_sensor_polling(runtime.handle());
 
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([920.0, 640.0]),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([920.0, 640.0])
+            .with_icon(load_window_icon()?),
         ..Default::default()
     };
 
@@ -607,4 +609,15 @@ fn tray_tooltip(data: &SensorData) -> String {
             .as_deref()
             .unwrap_or("Unavailable")
     )
+}
+
+fn load_window_icon() -> Result<egui::IconData> {
+    let image = image::load_from_memory(include_bytes!("../assets/icon.png"))?.into_rgba8();
+    let (width, height) = image.dimensions();
+
+    Ok(egui::IconData {
+        rgba: image.into_raw(),
+        width,
+        height,
+    })
 }

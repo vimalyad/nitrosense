@@ -2531,6 +2531,7 @@ dependencies = [
  "anyhow",
  "eframe",
  "egui_plot",
+ "image",
  "notify-rust",
  "serde",
  "serde_json",
