@@ -40,7 +40,7 @@ impl GraphHistory {
         self.samples.push_back(GraphSample {
             sampled_at,
             cpu_temp_celsius: data.cpu_package_temp_celsius,
-            gpu_temp_celsius: data.nvidia_gpu_temp_celsius.or(data.intel_gpu_temp_celsius),
+            gpu_temp_celsius: data.nvidia_gpu_temp_celsius,
         });
     }
 

@@ -50,6 +50,10 @@ Important conclusions so far:
   system fan.
 - On Linux, this laptop exposes fan RPM and PWM control through the kernel
   `acer-wmi` hwmon adapter, so this app uses that native interface first.
+- The Intel integrated GPU temperature is intentionally not shown. On the tested
+  Fedora install, the Intel GPU uses `i915` but exposes no `i915` hwmon node, no
+  DRM `device/hwmon`, and no `lm_sensors` temperature; generic thermal zones are
+  not mapped blindly because they are not labeled as iGPU sensors.
 - Raw EC writes are intentionally avoided unless a safe model-specific path is
   verified later.
 

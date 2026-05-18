@@ -94,7 +94,7 @@ pub fn evaluate_alerts(data: &SensorData, config: &AppConfig) -> Vec<ThermalAler
         }
     }
 
-    let gpu_temp = data.nvidia_gpu_temp_celsius.or(data.intel_gpu_temp_celsius);
+    let gpu_temp = data.nvidia_gpu_temp_celsius;
 
     if let Some(gpu_temp) = gpu_temp {
         if gpu_temp >= config.gpu_critical_celsius {

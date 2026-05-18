@@ -461,8 +461,8 @@ Discrete GPU temperature source:
 - The app therefore reads NVIDIA/discrete GPU temperature from Acer firmware
   hwmon `temp3_input` when no native NVIDIA hwmon temperature exists.
 - If `temp3_input` is missing, the app tries Acer firmware hwmon `temp2_input`.
-- Intel GPU temperature remains unavailable until Linux exposes a real Intel GPU
-  temperature source.
+- Intel GPU temperature is intentionally not shown in the UI until Linux exposes
+  a real Intel GPU temperature source.
 
 Practical implementation decision:
 

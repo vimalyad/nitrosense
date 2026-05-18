@@ -10,7 +10,6 @@ const BATTERY_ROOT: &str = "/sys/class/power_supply/BAT1";
 pub struct SensorData {
     pub cpu_package_temp_celsius: Option<f32>,
     pub nvidia_gpu_temp_celsius: Option<f32>,
-    pub intel_gpu_temp_celsius: Option<f32>,
     pub cpu_fan_rpm: Option<u32>,
     pub gpu_fan_rpm: Option<u32>,
     pub nvme_temp_celsius: Option<f32>,
@@ -22,7 +21,6 @@ pub struct SensorData {
 pub struct HwmonDevices {
     pub coretemp: Option<PathBuf>,
     pub nvidia: Option<PathBuf>,
-    pub intel_gpu: Option<PathBuf>,
     pub acer: Option<PathBuf>,
     pub nvme: Option<PathBuf>,
 }
@@ -47,10 +45,6 @@ impl HwmonDevices {
                         .as_deref()
                         .and_then(read_acer_discrete_gpu_temp_celsius)
                 }),
-            intel_gpu_temp_celsius: self
-                .intel_gpu
-                .as_deref()
-                .and_then(|path| read_temp_celsius(path, 1)),
             cpu_fan_rpm: self.acer.as_deref().and_then(|path| read_fan_rpm(path, 1)),
             gpu_fan_rpm: self.acer.as_deref().and_then(|path| read_fan_rpm(path, 2)),
             nvme_temp_celsius: self
@@ -87,7 +81,6 @@ impl HwmonDevices {
         match classify_hwmon_adapter(name) {
             Some(HwmonAdapter::Coretemp) => self.coretemp.get_or_insert(path),
             Some(HwmonAdapter::Nvidia) => self.nvidia.get_or_insert(path),
-            Some(HwmonAdapter::IntelGpu) => self.intel_gpu.get_or_insert(path),
             Some(HwmonAdapter::Acer) => self.acer.get_or_insert(path),
             Some(HwmonAdapter::Nvme) => self.nvme.get_or_insert(path),
             None => return,
@@ -103,7 +96,6 @@ pub fn read_current_sensor_data_result() -> io::Result<SensorData> {
 enum HwmonAdapter {
     Coretemp,
     Nvidia,
-    IntelGpu,
     Acer,
     Nvme,
 }
@@ -115,8 +107,6 @@ fn classify_hwmon_adapter(name: &str) -> Option<HwmonAdapter> {
         Some(HwmonAdapter::Coretemp)
     } else if normalized == "nvidia" {
         Some(HwmonAdapter::Nvidia)
-    } else if normalized == "i915" {
-        Some(HwmonAdapter::IntelGpu)
     } else if normalized.starts_with("acer") {
         Some(HwmonAdapter::Acer)
     } else if normalized == "nvme" {
@@ -203,7 +193,6 @@ mod tests {
             Some(HwmonAdapter::Coretemp)
         );
         assert_eq!(classify_hwmon_adapter("nvidia"), Some(HwmonAdapter::Nvidia));
-        assert_eq!(classify_hwmon_adapter("i915"), Some(HwmonAdapter::IntelGpu));
         assert_eq!(
             classify_hwmon_adapter("acer-isa-0000"),
             Some(HwmonAdapter::Acer)

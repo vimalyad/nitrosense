@@ -177,9 +177,9 @@ impl NitroSenseApp {
                 );
                 self.stat_card(
                     ui,
-                    "Intel GPU",
-                    format_temperature(self.sensor_data().intel_gpu_temp_celsius),
-                    "Integrated",
+                    "NVMe",
+                    format_temperature(self.sensor_data().nvme_temp_celsius),
+                    "Storage",
                 );
                 ui.end_row();
 
@@ -197,18 +197,12 @@ impl NitroSenseApp {
                 );
                 self.stat_card(
                     ui,
-                    "NVMe",
-                    format_temperature(self.sensor_data().nvme_temp_celsius),
-                    "Storage",
-                );
-                ui.end_row();
-
-                self.stat_card(
-                    ui,
                     "Battery",
                     format_voltage(self.sensor_data().battery_voltage),
                     "BAT1",
                 );
+                ui.end_row();
+
                 self.stat_card(
                     ui,
                     "Profile",
@@ -218,6 +212,7 @@ impl NitroSenseApp {
                         .unwrap_or_else(|| "Unavailable".to_owned()),
                     "Platform",
                 );
+                ui.label("");
                 ui.label("");
                 ui.end_row();
             });

@@ -166,7 +166,7 @@ Implementation decision:
   temperature on this AN515-58.
 - Fall back to Acer firmware hwmon `temp2_input` only if `temp3_input` is
   missing.
-- Keep Intel GPU temperature as `Unavailable` unless the Linux kernel exposes a
+- Do not show Intel GPU temperature in the app unless the Linux kernel exposes a
   real Intel GPU temperature source such as an `i915` hwmon adapter.
 
 ## Current Linux Implementation Decision
