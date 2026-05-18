@@ -117,26 +117,31 @@ impl NitroSenseApp {
 
 impl eframe::App for NitroSenseApp {
     fn update(&mut self, context: &egui::Context, _frame: &mut eframe::Frame) {
+        apply_nitro_style(context);
         self.refresh_sensor_snapshot();
         self.handle_window_close_request(context);
         self.handle_tray_action(context);
 
-        egui::CentralPanel::default().show(context, |ui| {
-            ui.add_space(8.0);
-            self.show_header(ui);
-            ui.add_space(12.0);
-            self.show_power_profile(ui);
-            ui.add_space(12.0);
-            self.show_stats(ui);
-            self.show_polling_status(ui);
-            self.show_notification_status(ui);
-            self.show_tray_status(ui);
-            ui.add_space(12.0);
-            self.show_tabs(ui);
-            ui.separator();
-            ui.add_space(8.0);
-            self.show_active_tab(ui);
-        });
+        egui::SidePanel::left("nitro_navigation")
+            .resizable(false)
+            .exact_width(176.0)
+            .frame(egui::Frame::none().fill(sidebar_color()))
+            .show(context, |ui| self.show_navigation(ui));
+
+        egui::CentralPanel::default()
+            .frame(egui::Frame::none().fill(app_background_color()))
+            .show(context, |ui| {
+                ui.add_space(14.0);
+                self.show_header(ui);
+                ui.add_space(14.0);
+                self.show_status_strip(ui);
+                ui.add_space(14.0);
+                self.show_polling_status(ui);
+                self.show_notification_status(ui);
+                self.show_tray_status(ui);
+                ui.add_space(8.0);
+                self.show_active_tab(ui);
+            });
     }
 }
 
@@ -218,19 +223,101 @@ impl NitroSenseApp {
     }
 
     fn show_header(&self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.heading("NitroSense");
+        ui.horizontal_centered(|ui| {
+            ui.heading(
+                egui::RichText::new("NitroSense")
+                    .size(30.0)
+                    .color(egui::Color32::WHITE),
+            );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label("Acer Nitro AN515-58");
+                ui.label(
+                    egui::RichText::new("Acer Nitro AN515-58")
+                        .strong()
+                        .color(egui::Color32::from_rgb(205, 210, 215)),
+                );
+            });
+        });
+        ui.add_space(8.0);
+        ui.painter().line_segment(
+            [
+                ui.cursor().min,
+                egui::pos2(ui.available_rect_before_wrap().right(), ui.cursor().min.y),
+            ],
+            egui::Stroke::new(2.0, accent_color()),
+        );
+    }
+
+    fn show_navigation(&mut self, ui: &mut egui::Ui) {
+        ui.add_space(18.0);
+        ui.vertical_centered(|ui| {
+            ui.label(
+                egui::RichText::new("NITRO")
+                    .size(26.0)
+                    .strong()
+                    .color(accent_color()),
+            );
+            ui.label(
+                egui::RichText::new("AN515-58")
+                    .size(12.0)
+                    .color(egui::Color32::from_rgb(150, 156, 162)),
+            );
+        });
+
+        ui.add_space(28.0);
+        nav_button(ui, &mut self.active_tab, AppTab::Overview, "Monitoring");
+        nav_button(ui, &mut self.active_tab, AppTab::Graph, "Temperature");
+        nav_button(ui, &mut self.active_tab, AppTab::FanControl, "Fan Control");
+
+        ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+            ui.add_space(16.0);
+            ui.label(
+                egui::RichText::new(
+                    self.sensor_data()
+                        .active_power_profile
+                        .as_deref()
+                        .unwrap_or("profile unavailable"),
+                )
+                .color(egui::Color32::from_rgb(190, 196, 202)),
+            );
+            ui.label(egui::RichText::new("Current profile").small().weak());
+        });
+    }
+
+    fn show_status_strip(&mut self, ui: &mut egui::Ui) {
+        panel_frame().show(ui, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                compact_metric(
+                    ui,
+                    "CPU",
+                    format_temperature(self.sensor_data().cpu_package_temp_celsius),
+                );
+                compact_metric(
+                    ui,
+                    "GPU",
+                    format_temperature(self.sensor_data().nvidia_gpu_temp_celsius),
+                );
+                compact_metric(ui, "CPU Fan", format_rpm(self.sensor_data().cpu_fan_rpm));
+                compact_metric(ui, "GPU Fan", format_rpm(self.sensor_data().gpu_fan_rpm));
+                compact_metric(
+                    ui,
+                    "Profile",
+                    self.sensor_data()
+                        .active_power_profile
+                        .clone()
+                        .unwrap_or_else(|| "Unavailable".to_owned()),
+                );
             });
         });
     }
 
     fn show_power_profile(&mut self, ui: &mut egui::Ui) {
-        ui.group(|ui| {
+        panel_frame().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.strong("Power Profile");
-                ui.separator();
+                ui.label(
+                    egui::RichText::new("Power Profile")
+                        .strong()
+                        .color(accent_color()),
+                );
                 ui.label(
                     self.sensor_data()
                         .active_power_profile
@@ -390,25 +477,20 @@ impl NitroSenseApp {
     }
 
     fn stat_card(&self, ui: &mut egui::Ui, title: &str, value: String, detail: &str) {
-        egui::Frame::group(ui.style())
+        panel_frame()
             .inner_margin(egui::Margin::symmetric(12.0, 10.0))
-            .rounding(egui::Rounding::same(6.0))
             .show(ui, |ui| {
                 ui.set_min_width(150.0);
-                ui.label(egui::RichText::new(title).strong());
+                ui.label(egui::RichText::new(title).strong().color(accent_color()));
                 ui.add_space(4.0);
-                ui.label(egui::RichText::new(value).size(24.0));
+                ui.label(
+                    egui::RichText::new(value)
+                        .size(24.0)
+                        .color(egui::Color32::WHITE),
+                );
                 ui.add_space(2.0);
                 ui.label(egui::RichText::new(detail).small().weak());
             });
-    }
-
-    fn show_tabs(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.selectable_value(&mut self.active_tab, AppTab::Overview, "Overview");
-            ui.selectable_value(&mut self.active_tab, AppTab::Graph, "Graph");
-            ui.selectable_value(&mut self.active_tab, AppTab::FanControl, "Fan Control");
-        });
     }
 
     fn show_active_tab(&mut self, ui: &mut egui::Ui) {
@@ -420,90 +502,108 @@ impl NitroSenseApp {
     }
 
     fn show_overview_tab(&self, ui: &mut egui::Ui) {
-        ui.heading("Overview");
-        ui.add_space(8.0);
-        fan_activity_bar(ui, "CPU Fan", self.sensor_data().cpu_fan_rpm);
-        fan_activity_bar(ui, "GPU Fan", self.sensor_data().gpu_fan_rpm);
-        ui.add_space(8.0);
-        ui.label(format!(
-            "Battery voltage: {}",
-            format_voltage(self.sensor_data().battery_voltage)
-        ));
+        ui.columns(2, |columns| {
+            columns[0].heading("Monitoring");
+            columns[0].add_space(8.0);
+            self.show_stats(&mut columns[0]);
+
+            columns[1].heading("Cooling");
+            columns[1].add_space(8.0);
+            fan_dashboard_panel(&mut columns[1], "CPU Fan", self.sensor_data().cpu_fan_rpm);
+            columns[1].add_space(10.0);
+            fan_dashboard_panel(&mut columns[1], "GPU Fan", self.sensor_data().gpu_fan_rpm);
+            columns[1].add_space(10.0);
+            panel_frame().show(&mut columns[1], |ui| {
+                ui.label(
+                    egui::RichText::new("Battery")
+                        .strong()
+                        .color(accent_color()),
+                );
+                ui.label(format_voltage(self.sensor_data().battery_voltage));
+            });
+        });
     }
 
     fn show_graph_tab(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Graph");
+        ui.heading("Temperature");
         ui.add_space(8.0);
-        ui.horizontal_wrapped(|ui| {
-            ui.checkbox(&mut self.graph_visibility.cpu_temp, "CPU Temp");
-            ui.checkbox(&mut self.graph_visibility.gpu_temp, "GPU Temp");
+        panel_frame().show(ui, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.checkbox(&mut self.graph_visibility.cpu_temp, "CPU Temp");
+                ui.checkbox(&mut self.graph_visibility.gpu_temp, "GPU Temp");
+            });
+            ui.add_space(8.0);
+            show_graph(ui, &self.graph_history, &self.graph_visibility);
         });
-        ui.add_space(8.0);
-        show_graph(ui, &self.graph_history, &self.graph_visibility);
     }
 
     fn show_fan_control_tab(&mut self, ui: &mut egui::Ui) {
         ui.heading("Fan Control");
         ui.add_space(8.0);
 
-        if let Some(path) = &self.fan_control_status.acer_hwmon_path {
-            ui.label(format!("Acer hwmon: {}", path.display()));
-        } else {
-            ui.colored_label(
-                egui::Color32::from_rgb(180, 90, 40),
-                "Acer hwmon adapter not found.",
-            );
-        }
-
-        if !self.fan_control_status.can_control() {
-            ui.colored_label(
-                egui::Color32::from_rgb(180, 90, 40),
-                "PWM controls are not available for both fans.",
-            );
-        }
-
-        ui.label(format!(
-            "CPU PWM: {} | GPU PWM: {}",
-            format_pwm_state(
-                self.fan_control_status.cpu_pwm,
-                self.fan_control_status.cpu_pwm_enable
-            ),
-            format_pwm_state(
-                self.fan_control_status.gpu_pwm,
-                self.fan_control_status.gpu_pwm_enable
-            )
-        ));
-
-        ui.add_space(8.0);
-        let cpu_fan_rpm = self.sensor_data().cpu_fan_rpm;
-        let gpu_fan_rpm = self.sensor_data().gpu_fan_rpm;
-
-        fan_slider_row(ui, "CPU Fan", &mut self.cpu_fan_percent, cpu_fan_rpm);
-        fan_slider_row(ui, "GPU Fan", &mut self.gpu_fan_percent, gpu_fan_rpm);
-
-        ui.add_space(8.0);
-        ui.horizontal(|ui| {
-            let controls_enabled = self.fan_control_status.can_control();
-
-            if ui
-                .add_enabled(controls_enabled, egui::Button::new("Apply"))
-                .clicked()
-            {
-                self.apply_manual_fan_speeds();
+        panel_frame().show(ui, |ui| {
+            if let Some(path) = &self.fan_control_status.acer_hwmon_path {
+                ui.label(format!("Acer hwmon: {}", path.display()));
+            } else {
+                ui.colored_label(warning_color(), "Acer hwmon adapter not found.");
             }
 
-            if ui
-                .add_enabled(controls_enabled, egui::Button::new("Auto"))
-                .clicked()
-            {
-                self.restore_auto_fan_control();
+            if !self.fan_control_status.can_control() {
+                ui.colored_label(
+                    warning_color(),
+                    "PWM controls are not available for both fans.",
+                );
             }
 
-            if ui.button("Refresh Status").clicked() {
-                self.fan_control_status = FanControlStatus::detect();
-                self.fan_control_message = Some("Fan control status refreshed.".to_owned());
-            }
+            ui.label(format!(
+                "CPU PWM: {} | GPU PWM: {}",
+                format_pwm_state(
+                    self.fan_control_status.cpu_pwm,
+                    self.fan_control_status.cpu_pwm_enable
+                ),
+                format_pwm_state(
+                    self.fan_control_status.gpu_pwm,
+                    self.fan_control_status.gpu_pwm_enable
+                )
+            ));
         });
+
+        ui.add_space(10.0);
+        panel_frame().show(ui, |ui| {
+            let cpu_fan_rpm = self.sensor_data().cpu_fan_rpm;
+            let gpu_fan_rpm = self.sensor_data().gpu_fan_rpm;
+
+            fan_slider_row(ui, "CPU Fan", &mut self.cpu_fan_percent, cpu_fan_rpm);
+            ui.add_space(8.0);
+            fan_slider_row(ui, "GPU Fan", &mut self.gpu_fan_percent, gpu_fan_rpm);
+
+            ui.add_space(12.0);
+            ui.horizontal(|ui| {
+                let controls_enabled = self.fan_control_status.can_control();
+
+                if ui
+                    .add_enabled(controls_enabled, egui::Button::new("Apply"))
+                    .clicked()
+                {
+                    self.apply_manual_fan_speeds();
+                }
+
+                if ui
+                    .add_enabled(controls_enabled, egui::Button::new("Auto"))
+                    .clicked()
+                {
+                    self.restore_auto_fan_control();
+                }
+
+                if ui.button("Refresh Status").clicked() {
+                    self.fan_control_status = FanControlStatus::detect();
+                    self.fan_control_message = Some("Fan control status refreshed.".to_owned());
+                }
+            });
+        });
+
+        ui.add_space(10.0);
+        self.show_power_profile(ui);
 
         if let Some(message) = &self.fan_control_message {
             ui.add_space(8.0);
@@ -534,6 +634,131 @@ impl NitroSenseApp {
             Err(error) => Some(format!("Could not restore automatic fan control: {error}")),
         };
     }
+}
+
+fn apply_nitro_style(context: &egui::Context) {
+    let mut visuals = egui::Visuals::dark();
+    visuals.window_fill = app_background_color();
+    visuals.panel_fill = app_background_color();
+    visuals.widgets.active.bg_fill = accent_color();
+    visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(86, 26, 30);
+    visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(35, 38, 43);
+    visuals.selection.bg_fill = accent_color();
+    context.set_visuals(visuals);
+}
+
+fn nav_button(ui: &mut egui::Ui, active_tab: &mut AppTab, tab: AppTab, label: &str) {
+    let active = *active_tab == tab;
+    let fill = if active {
+        egui::Color32::from_rgb(120, 24, 30)
+    } else {
+        sidebar_color()
+    };
+    let text_color = if active {
+        egui::Color32::WHITE
+    } else {
+        egui::Color32::from_rgb(185, 190, 195)
+    };
+
+    let button = egui::Button::new(egui::RichText::new(label).strong().color(text_color))
+        .fill(fill)
+        .stroke(if active {
+            egui::Stroke::new(1.0, accent_color())
+        } else {
+            egui::Stroke::NONE
+        });
+
+    if ui.add_sized([144.0, 38.0], button).clicked() {
+        *active_tab = tab;
+    }
+    ui.add_space(6.0);
+}
+
+fn compact_metric(ui: &mut egui::Ui, label: &str, value: String) {
+    ui.vertical(|ui| {
+        ui.set_min_width(112.0);
+        ui.label(egui::RichText::new(label).small().weak());
+        ui.label(
+            egui::RichText::new(value)
+                .strong()
+                .color(egui::Color32::WHITE),
+        );
+    });
+    ui.separator();
+}
+
+fn fan_dashboard_panel(ui: &mut egui::Ui, label: &str, rpm: Option<u32>) {
+    panel_frame().show(ui, |ui| {
+        ui.horizontal(|ui| {
+            draw_fan_badge(ui, rpm);
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new(label).strong().color(accent_color()));
+                ui.label(
+                    egui::RichText::new(format_rpm(rpm))
+                        .size(22.0)
+                        .color(egui::Color32::WHITE),
+                );
+                fan_activity_bar(ui, label, rpm);
+            });
+        });
+    });
+}
+
+fn draw_fan_badge(ui: &mut egui::Ui, rpm: Option<u32>) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(72.0, 72.0), egui::Sense::hover());
+    let painter = ui.painter_at(rect);
+    let center = rect.center();
+    let radius = 30.0;
+    let speed = rpm
+        .map(|value| (value as f32 / 7_500.0).clamp(0.15, 1.0))
+        .unwrap_or(0.15);
+
+    painter.circle_filled(center, radius, egui::Color32::from_rgb(24, 26, 30));
+    painter.circle_stroke(center, radius, egui::Stroke::new(2.0, accent_color()));
+
+    for blade in 0..3 {
+        let angle = blade as f32 * std::f32::consts::TAU / 3.0 + speed;
+        let tip = center + egui::vec2(angle.cos(), angle.sin()) * 24.0;
+        let side = center + egui::vec2((angle + 1.95).cos(), (angle + 1.95).sin()) * 10.0;
+        painter.line_segment(
+            [center, tip],
+            egui::Stroke::new(6.0, egui::Color32::from_rgb(220, 34, 44)),
+        );
+        painter.line_segment(
+            [center, side],
+            egui::Stroke::new(3.0, egui::Color32::from_rgb(125, 130, 136)),
+        );
+    }
+
+    painter.circle_filled(center, 6.0, egui::Color32::WHITE);
+}
+
+fn panel_frame() -> egui::Frame {
+    egui::Frame::none()
+        .fill(panel_color())
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(52, 56, 62)))
+        .rounding(egui::Rounding::same(6.0))
+        .inner_margin(egui::Margin::symmetric(14.0, 12.0))
+}
+
+fn app_background_color() -> egui::Color32 {
+    egui::Color32::from_rgb(15, 17, 21)
+}
+
+fn sidebar_color() -> egui::Color32 {
+    egui::Color32::from_rgb(10, 11, 14)
+}
+
+fn panel_color() -> egui::Color32 {
+    egui::Color32::from_rgb(28, 31, 36)
+}
+
+fn accent_color() -> egui::Color32 {
+    egui::Color32::from_rgb(226, 31, 42)
+}
+
+fn warning_color() -> egui::Color32 {
+    egui::Color32::from_rgb(235, 150, 60)
 }
 
 fn format_pwm_state(pwm: Option<u8>, enable: Option<u8>) -> String {
