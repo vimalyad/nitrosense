@@ -10,6 +10,7 @@ use crate::notifications::{send_desktop_notification, ThermalAlertState};
 use crate::polling::{spawn_sensor_polling, SensorSnapshot};
 use crate::profile::{self, PowerProfile};
 use crate::sensors::SensorData;
+use crate::tray::{state_for_cpu_temp, TrayAction, TrayController};
 
 pub fn run() -> Result<()> {
     let runtime = Runtime::new()?;
@@ -56,6 +57,9 @@ struct NitroSenseApp {
     app_config: AppConfig,
     thermal_alerts: ThermalAlertState,
     notification_status: Option<String>,
+    tray_controller: TrayController,
+    window_hidden_to_tray: bool,
+    allow_window_close: bool,
     active_tab: AppTab,
 }
 
@@ -70,13 +74,29 @@ impl NitroSenseApp {
         let mut graph_history = GraphHistory::new();
         graph_history.push(std::time::Instant::now(), &sensor_snapshot.data);
 
+        let profile_choices = profile::read_profile_choices().unwrap_or_default();
+        let profile_names = if profile_choices.is_empty() {
+            fallback_profile_names()
+        } else {
+            profile_choices
+                .iter()
+                .map(|profile| profile.name.clone())
+                .collect()
+        };
+
+        let mut tray_controller = TrayController::new(&profile_names);
+        tray_controller.set_temperature_state(state_for_cpu_temp(
+            sensor_snapshot.data.cpu_package_temp_celsius,
+        ));
+        tray_controller.set_tooltip(tray_tooltip(&sensor_snapshot.data));
+
         Self {
             _runtime: runtime,
             sensor_receiver,
             sensor_snapshot,
             graph_history,
             graph_visibility: GraphVisibility::default(),
-            profile_choices: profile::read_profile_choices().unwrap_or_default(),
+            profile_choices,
             profile_status: None,
             fan_control_status: FanControlStatus::detect(),
             cpu_fan_percent: 50,
@@ -85,6 +105,9 @@ impl NitroSenseApp {
             app_config: AppConfig::default(),
             thermal_alerts: ThermalAlertState::default(),
             notification_status: None,
+            tray_controller,
+            window_hidden_to_tray: false,
+            allow_window_close: false,
             active_tab: AppTab::Overview,
         }
     }
@@ -93,6 +116,8 @@ impl NitroSenseApp {
 impl eframe::App for NitroSenseApp {
     fn update(&mut self, context: &egui::Context, _frame: &mut eframe::Frame) {
         self.refresh_sensor_snapshot();
+        self.handle_window_close_request(context);
+        self.handle_tray_action(context);
 
         egui::CentralPanel::default().show(context, |ui| {
             ui.add_space(8.0);
@@ -103,6 +128,7 @@ impl eframe::App for NitroSenseApp {
             self.show_stats(ui);
             self.show_polling_status(ui);
             self.show_notification_status(ui);
+            self.show_tray_status(ui);
             ui.add_space(12.0);
             self.show_tabs(ui);
             ui.separator();
@@ -118,7 +144,46 @@ impl NitroSenseApp {
             self.sensor_snapshot = self.sensor_receiver.borrow_and_update().clone();
             self.graph_history
                 .push(std::time::Instant::now(), &self.sensor_snapshot.data);
+            self.update_tray();
             self.process_thermal_alerts();
+        }
+    }
+
+    fn update_tray(&mut self) {
+        self.tray_controller
+            .set_temperature_state(state_for_cpu_temp(
+                self.sensor_snapshot.data.cpu_package_temp_celsius,
+            ));
+        self.tray_controller
+            .set_tooltip(tray_tooltip(&self.sensor_snapshot.data));
+    }
+
+    fn handle_window_close_request(&mut self, context: &egui::Context) {
+        if self.allow_window_close || !self.tray_controller.is_available() {
+            return;
+        }
+
+        if context.input(|input| input.viewport().close_requested()) {
+            context.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            context.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+            self.window_hidden_to_tray = true;
+        }
+    }
+
+    fn handle_tray_action(&mut self, context: &egui::Context) {
+        while let Some(action) = self.tray_controller.poll_action() {
+            match action {
+                TrayAction::ShowWindow => {
+                    context.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                    context.send_viewport_cmd(egui::ViewportCommand::Focus);
+                    self.window_hidden_to_tray = false;
+                }
+                TrayAction::Quit => {
+                    self.allow_window_close = true;
+                    context.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                TrayAction::SetProfile(profile_name) => self.set_power_profile(profile_name),
+            }
         }
     }
 
@@ -305,6 +370,13 @@ impl NitroSenseApp {
                 egui::Color32::from_rgb(180, 90, 40),
                 format!("Sensor polling issue: {error}"),
             );
+        }
+    }
+
+    fn show_tray_status(&self, ui: &mut egui::Ui) {
+        if self.window_hidden_to_tray {
+            ui.add_space(8.0);
+            ui.label("Window hidden to tray.");
         }
     }
 
@@ -525,4 +597,14 @@ fn display_profile_name(profile_name: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+fn tray_tooltip(data: &SensorData) -> String {
+    format!(
+        "CPU: {} | Profile: {}",
+        format_temperature(data.cpu_package_temp_celsius),
+        data.active_power_profile
+            .as_deref()
+            .unwrap_or("Unavailable")
+    )
 }
