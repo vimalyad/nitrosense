@@ -2,7 +2,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::profile;
+use crate::hardware::profile;
 
 const BATTERY_ROOT: &str = "/sys/class/power_supply/BAT1";
 

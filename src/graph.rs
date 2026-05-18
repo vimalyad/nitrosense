@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use eframe::egui;
 use egui_plot::{CoordinatesFormatter, Corner, Legend, Line, Plot, PlotBounds, PlotPoints};
 
-use crate::sensors::SensorData;
+use crate::hardware::sensors::SensorData;
 
 const GRAPH_WINDOW: Duration = Duration::from_secs(30 * 60);
 const GRAPH_CAPACITY: usize = 30 * 60;

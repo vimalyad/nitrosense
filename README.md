@@ -107,14 +107,11 @@ touchpoints, so validate setup on your own machine before relying on the app.
 
 ## Project Structure
 
-- `src/app.rs`: main UI and app state
-- `src/sensors.rs`: `/sys` sensor discovery and reads
-- `src/polling.rs`: background sensor polling
-- `src/profile.rs`: platform profile reads/writes
-- `src/fan_control.rs`: Acer hwmon PWM fan-control backend
+- `src/app/`: app lifecycle, state, actions, screen rendering, and formatting
+- `src/ui/`: Nitro-style theme and reusable egui widgets
+- `src/hardware/`: `/sys` sensor discovery, platform profiles, and Acer hwmon fan control
+- `src/services/`: background polling, thermal notifications, and tray integration
 - `src/graph.rs`: rolling graph history and rendering
-- `src/notifications.rs`: thermal alerts and desktop notifications
-- `src/tray.rs`: feature-gated tray integration
 - `docs/setup.md`: Fedora setup and install notes
 - `docs/handoff.md`: architecture and continuation notes
 - `docs/official-app-analysis.md`: local official-app extraction guide

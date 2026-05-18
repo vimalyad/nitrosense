@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use notify_rust::Notification;
 
 use crate::config::AppConfig;
-use crate::sensors::SensorData;
+use crate::hardware::sensors::SensorData;
 
 const WARNING_COOLDOWN: Duration = Duration::from_secs(5 * 60);
 const CRITICAL_COOLDOWN: Duration = Duration::from_secs(2 * 60);

@@ -3,7 +3,7 @@ use std::time::Duration;
 use tokio::runtime::Handle;
 use tokio::sync::watch;
 
-use crate::sensors::{read_current_sensor_data_result, SensorData};
+use crate::hardware::sensors::{read_current_sensor_data_result, SensorData};
 
 const SENSOR_POLL_INTERVAL: Duration = Duration::from_secs(1);
 

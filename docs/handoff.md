@@ -4,14 +4,18 @@
 
 NitroSense is a native Rust desktop app using `eframe`/`egui`.
 
-- `src/app.rs`: app state, UI, profile actions, fan actions, graph display, notifications, tray integration glue.
-- `src/sensors.rs`: read-only `/sys` hwmon discovery and sensor reads.
-- `src/polling.rs`: Tokio background polling task that sends `SensorSnapshot` values through a watch channel.
-- `src/profile.rs`: platform profile reads and privileged writes through `sudo -n tee`.
-- `src/fan_control.rs`: Acer `acer-wmi` hwmon PWM discovery and write helpers.
+- `src/app/mod.rs`: app startup, state, lifecycle, and hardware action handlers.
+- `src/app/views.rs`: header, navigation, status, overview, graph, and fan-control screen rendering.
+- `src/app/formatting.rs`: pure display-formatting helpers and tests.
+- `src/ui/theme.rs`: Nitro-style colors, egui visuals, and reusable panel frame.
+- `src/ui/widgets.rs`: reusable egui widgets such as navigation buttons, metrics, fan panels, and sliders.
+- `src/hardware/sensors.rs`: read-only `/sys` hwmon discovery and sensor reads.
+- `src/hardware/profile.rs`: platform profile reads and privileged writes through `sudo -n tee`.
+- `src/hardware/fan_control.rs`: Acer `acer-wmi` hwmon PWM discovery and write helpers.
+- `src/services/polling.rs`: Tokio background polling task that sends `SensorSnapshot` values through a watch channel.
+- `src/services/notifications.rs`: thermal alert thresholds, cooldowns, and `notify-rust` delivery.
+- `src/services/tray.rs`: feature-gated tray integration with a no-op default backend.
 - `src/graph.rs`: RAM-only rolling graph history and `egui_plot` rendering.
-- `src/notifications.rs`: thermal alert thresholds, cooldowns, and `notify-rust` delivery.
-- `src/tray.rs`: feature-gated tray integration with a no-op default backend.
 - `docs/setup.md`: Fedora dependencies and local installation/setup commands.
 
 ## Important Build Commands

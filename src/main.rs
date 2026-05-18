@@ -1,12 +1,9 @@
 mod app;
 mod config;
-mod fan_control;
 mod graph;
-mod notifications;
-mod polling;
-mod profile;
-mod sensors;
-mod tray;
+mod hardware;
+mod services;
+mod ui;
 
 use anyhow::Result;
 
