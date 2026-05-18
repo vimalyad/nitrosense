@@ -27,6 +27,7 @@ not tracked.
 - Thermal desktop notifications
 - Feature-gated system tray support
 - Desktop entry and setup documentation
+- Correctly sized hicolor application icons for desktop launchers
 
 ## Reverse Engineering Notes
 
@@ -116,6 +117,10 @@ pkexec nitrosense --fan-helper set-auto
 
 The GUI never reads or stores your password. Polkit shows the system
 authentication prompt and the helper only accepts validated fan-control commands.
+
+Launcher icons are installed from `assets/icons/hicolor/`, which contains
+standard hicolor sizes generated from `assets/icon.png`. Do not install the
+large source PNG directly into a fixed-size hicolor directory.
 
 Use these controls carefully. Fan control and power profile changes are hardware
 touchpoints, so validate setup on your own machine before relying on the app.

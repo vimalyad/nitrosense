@@ -14,12 +14,12 @@ rm -rf "${STAGE_DIR}"
 mkdir -p \
   "${STAGE_DIR}/bin" \
   "${STAGE_DIR}/share/applications" \
-  "${STAGE_DIR}/share/icons/hicolor/256x256/apps" \
+  "${STAGE_DIR}/share/icons/hicolor" \
   "${STAGE_DIR}/docs"
 
 install -Dm755 "target/release/${APP_NAME}" "${STAGE_DIR}/bin/${APP_NAME}"
 install -Dm644 "packaging/${APP_NAME}.desktop" "${STAGE_DIR}/share/applications/${APP_NAME}.desktop"
-install -Dm644 "assets/icon.png" "${STAGE_DIR}/share/icons/hicolor/256x256/apps/${APP_NAME}.png"
+cp -R "assets/icons/hicolor/." "${STAGE_DIR}/share/icons/hicolor/"
 install -Dm644 "README.md" "${STAGE_DIR}/README.md"
 install -Dm644 "my_laptop.md" "${STAGE_DIR}/my_laptop.md"
 install -Dm644 "nitrosense_info.md" "${STAGE_DIR}/nitrosense_info.md"
@@ -39,9 +39,10 @@ From this extracted archive:
 
 ```bash
 install -Dm755 bin/nitrosense ~/.local/bin/nitrosense
-install -Dm644 share/icons/hicolor/256x256/apps/nitrosense.png ~/.local/share/icons/hicolor/256x256/apps/nitrosense.png
+cp -R share/icons/hicolor/. ~/.local/share/icons/hicolor/
 install -Dm644 share/applications/nitrosense.desktop ~/.local/share/applications/nitrosense.desktop
 update-desktop-database ~/.local/share/applications
+gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor 2>/dev/null || true
 ```
 
 Then launch `NitroSense` from your application menu or run:

@@ -70,7 +70,8 @@ Install the binary and icon:
 ```bash
 cargo build --release
 install -Dm755 target/release/nitrosense ~/.local/bin/nitrosense
-install -Dm644 assets/icon.png ~/.local/share/icons/hicolor/256x256/apps/nitrosense.png
+cp -R assets/icons/hicolor/. ~/.local/share/icons/hicolor/
 install -Dm644 packaging/nitrosense.desktop ~/.local/share/applications/nitrosense.desktop
 update-desktop-database ~/.local/share/applications
+gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor 2>/dev/null || true
 ```
