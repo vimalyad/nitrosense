@@ -12,7 +12,7 @@ use crate::ui::widgets::{compact_metric, fan_dashboard_panel, fan_slider_row, na
 
 impl NitroSenseApp {
     pub(super) fn show_header(&self, ui: &mut egui::Ui) {
-        ui.horizontal_centered(|ui| {
+        ui.horizontal(|ui| {
             ui.heading(
                 egui::RichText::new("NitroSense")
                     .size(30.0)
