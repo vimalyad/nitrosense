@@ -2,7 +2,8 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-const PLATFORM_PROFILE_PATH: &str = "/sys/firmware/acpi/platform_profile";
+use crate::profile;
+
 const BATTERY_ROOT: &str = "/sys/class/power_supply/BAT1";
 
 #[derive(Debug, Clone, Default)]
@@ -52,7 +53,10 @@ impl HwmonDevices {
                 .as_deref()
                 .and_then(|path| read_temp_celsius(path, 1)),
             battery_voltage: read_battery_voltage(),
-            active_power_profile: read_trimmed_file(PLATFORM_PROFILE_PATH),
+            active_power_profile: profile::read_active_profile()
+                .ok()
+                .flatten()
+                .map(|profile| profile.name),
         }
     }
 
