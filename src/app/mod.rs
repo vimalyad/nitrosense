@@ -10,7 +10,7 @@ use tokio::sync::watch;
 use crate::app::formatting::{display_profile_name, fallback_profile_names, tray_tooltip};
 use crate::config::AppConfig;
 use crate::graph::{GraphHistory, GraphVisibility};
-use crate::hardware::fan_control::{self, FanControlStatus, FanId};
+use crate::hardware::fan_control::{self, FanControlStatus};
 use crate::hardware::profile::{self, PowerProfile};
 use crate::hardware::sensors::SensorData;
 use crate::services::notifications::{send_desktop_notification, ThermalAlertState};
@@ -279,20 +279,16 @@ impl NitroSenseApp {
     }
 
     fn apply_manual_fan_speeds(&mut self) {
-        let cpu_result = fan_control::set_manual_speed(FanId::Cpu, self.cpu_fan_percent);
-        let gpu_result = fan_control::set_manual_speed(FanId::Gpu, self.gpu_fan_percent);
+        let update_result =
+            fan_control::set_manual_speeds(self.cpu_fan_percent, self.gpu_fan_percent);
+        let failed = update_result.is_err();
 
-        let failed = cpu_result.is_err() || gpu_result.is_err();
-        self.fan_control_message = match (cpu_result, gpu_result) {
-            (Ok(()), Ok(())) => Some(format!(
+        self.fan_control_message = match update_result {
+            Ok(()) => Some(format!(
                 "Applied CPU {}% and GPU {}%.",
                 self.cpu_fan_percent, self.gpu_fan_percent
             )),
-            (Err(cpu_error), Ok(())) => Some(format!("CPU fan update failed: {cpu_error}")),
-            (Ok(()), Err(gpu_error)) => Some(format!("GPU fan update failed: {gpu_error}")),
-            (Err(cpu_error), Err(gpu_error)) => Some(format!(
-                "CPU fan update failed: {cpu_error}; GPU fan update failed: {gpu_error}"
-            )),
+            Err(error) => Some(format!("Fan update failed: {error}")),
         };
 
         if failed {

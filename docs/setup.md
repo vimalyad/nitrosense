@@ -54,8 +54,22 @@ Manual helper examples:
 pkexec nitrosense --fan-helper authorize
 pkexec nitrosense --fan-helper set-manual cpu 50
 pkexec nitrosense --fan-helper set-manual gpu 50
+pkexec nitrosense --fan-helper set-manual-both 50 50
 pkexec nitrosense --fan-helper set-auto
 ```
+
+Run the local installer after building:
+
+```bash
+scripts/install-local.sh release
+```
+
+That command installs `/usr/share/polkit-1/actions/io.github.vimalyad.nitrosense.fan-control.policy`
+for the absolute path `~/.local/bin/nitrosense`. The policy uses
+`auth_admin_keep`, so Polkit should retain a successful fan-control
+authentication briefly for repeated slider updates. If you launch a different
+binary path, such as `target/release/nitrosense`, the policy annotation will not
+match and `pkexec` will fall back to the generic action, which can prompt again.
 
 Install `polkit`/`pkexec` if your distribution does not include it:
 

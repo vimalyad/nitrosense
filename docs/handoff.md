@@ -54,7 +54,9 @@ sudo dnf install gtk3-devel libappindicator-gtk3-devel
 - Manual fan control is AN515-58-specific and uses the Acer hwmon PWM files
   exposed by `acer-wmi`. The GUI calls the same binary through
   `pkexec --fan-helper ...`, so Polkit handles authentication and the helper
-  performs validated writes.
+  performs validated writes. `scripts/install-local.sh` installs a dedicated
+  Polkit policy for `~/.local/bin/nitrosense --fan-helper` with
+  `auth_admin_keep`; running a different binary path will not match that policy.
 
 ## Branch Flow
 

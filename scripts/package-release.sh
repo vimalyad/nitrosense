@@ -13,11 +13,13 @@ cargo build --release
 rm -rf "${STAGE_DIR}"
 mkdir -p \
   "${STAGE_DIR}/bin" \
+  "${STAGE_DIR}/packaging" \
   "${STAGE_DIR}/share/applications" \
   "${STAGE_DIR}/share/icons/hicolor" \
   "${STAGE_DIR}/docs"
 
 install -Dm755 "target/release/${APP_NAME}" "${STAGE_DIR}/bin/${APP_NAME}"
+install -Dm644 "packaging/io.github.vimalyad.nitrosense.policy.in" "${STAGE_DIR}/packaging/io.github.vimalyad.nitrosense.policy.in"
 install -Dm644 "packaging/${APP_NAME}.desktop" "${STAGE_DIR}/share/applications/${APP_NAME}.desktop"
 cp -R "assets/icons/hicolor/." "${STAGE_DIR}/share/icons/hicolor/"
 install -Dm644 "README.md" "${STAGE_DIR}/README.md"
@@ -51,6 +53,14 @@ update-desktop-database ~/.local/share/applications
 gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor 2>/dev/null || true
 xdg-icon-resource forceupdate --theme hicolor --mode user
 kbuildsycoca6 --noincremental 2>/dev/null || true
+
+policy_file="$(mktemp)"
+trap 'rm -f "$policy_file"' EXIT
+escaped_binary="$(printf '%s' "$HOME/.local/bin/nitrosense" | sed 's/[\/&]/\\&/g')"
+sed "s/@NITROSENSE_EXEC@/${escaped_binary}/g" \
+  packaging/io.github.vimalyad.nitrosense.policy.in > "$policy_file"
+sudo install -Dm644 "$policy_file" \
+  /usr/share/polkit-1/actions/io.github.vimalyad.nitrosense.fan-control.policy
 ```
 
 Then launch `NitroSense` from your application menu or run:
@@ -61,8 +71,10 @@ nitrosense
 
 ## Runtime Notes
 
-Fan writes use Polkit through `pkexec nitrosense --fan-helper ...`; profile
-writes still use sudo. See `docs/setup.md`.
+Fan writes use Polkit through `pkexec nitrosense --fan-helper ...`. The policy
+installed above uses `auth_admin_keep`, so one successful fan-control
+authentication should be retained briefly by Polkit for later slider updates.
+Profile writes still use sudo. See `docs/setup.md`.
 
 This is alpha hardware-control software. Use only if your laptop exposes the
 expected Acer hwmon PWM controls.

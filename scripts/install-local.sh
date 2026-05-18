@@ -7,6 +7,9 @@ BIN_DIR="${HOME}/.local/bin"
 DATA_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}"
 APP_DIR="${DATA_DIR}/applications"
 ICON_DIR="${DATA_DIR}/icons/hicolor"
+POLKIT_ACTION_DIR="/usr/share/polkit-1/actions"
+POLKIT_ACTION_ID="io.github.vimalyad.nitrosense.fan-control"
+POLKIT_POLICY="${POLKIT_ACTION_DIR}/${POLKIT_ACTION_ID}.policy"
 
 case "${BUILD_PROFILE}" in
   release)
@@ -38,3 +41,13 @@ update-desktop-database "${APP_DIR}"
 gtk-update-icon-cache -f -t "${ICON_DIR}" 2>/dev/null || true
 xdg-icon-resource forceupdate --theme hicolor --mode user
 kbuildsycoca6 --noincremental 2>/dev/null || true
+
+policy_file="$(mktemp)"
+trap 'rm -f "${policy_file}"' EXIT
+escaped_binary="$(printf '%s' "${BIN_DIR}/${APP_NAME}" | sed 's/[\/&]/\\&/g')"
+sed "s/@NITROSENSE_EXEC@/${escaped_binary}/g" \
+  "packaging/${POLKIT_ACTION_ID}.policy.in" > "${policy_file}"
+sudo install -Dm644 "${policy_file}" "${POLKIT_POLICY}"
+
+echo "Installed ${BIN_DIR}/${APP_NAME}"
+echo "Installed Polkit action ${POLKIT_POLICY}"

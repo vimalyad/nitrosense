@@ -118,11 +118,17 @@ binary:
 ```bash
 pkexec nitrosense --fan-helper set-manual cpu 50
 pkexec nitrosense --fan-helper set-manual gpu 50
+pkexec nitrosense --fan-helper set-manual-both 50 50
 pkexec nitrosense --fan-helper set-auto
 ```
 
-The GUI never reads or stores your password. Polkit shows the system
-authentication prompt and the helper only accepts validated fan-control commands.
+The local installer also installs a NitroSense Polkit action for the installed
+binary path with `auth_admin_keep`. The GUI never reads or stores your password;
+Polkit shows the system authentication prompt, keeps the authorization briefly,
+and the helper only accepts validated fan-control commands. If you run the app
+directly from `target/release/nitrosense`, that installed policy path will not
+match, so use the application launcher or `~/.local/bin/nitrosense` for normal
+fan control testing.
 
 Launcher icons are installed from `assets/icons/hicolor/`, which contains the
 fixed app sizes declared by Fedora's hicolor theme, including `22x22`, `36x36`,

@@ -20,13 +20,6 @@ impl FanId {
         }
     }
 
-    fn helper_name(self) -> &'static str {
-        match self {
-            Self::Cpu => "cpu",
-            Self::Gpu => "gpu",
-        }
-    }
-
     fn from_helper_name(value: &str) -> Option<Self> {
         match value {
             "cpu" => Some(Self::Cpu),
@@ -57,9 +50,10 @@ impl FanControlStatus {
     }
 }
 
-pub fn set_manual_speed(fan: FanId, percent: u8) -> io::Result<()> {
-    let percent = percent.min(100).to_string();
-    run_pkexec_helper(&["set-manual", fan.helper_name(), &percent])
+pub fn set_manual_speeds(cpu_percent: u8, gpu_percent: u8) -> io::Result<()> {
+    let cpu_percent = cpu_percent.min(100).to_string();
+    let gpu_percent = gpu_percent.min(100).to_string();
+    run_pkexec_helper(&["set-manual-both", &cpu_percent, &gpu_percent])
 }
 
 pub fn set_auto_mode() -> io::Result<()> {
@@ -92,6 +86,31 @@ pub fn handle_helper_args(args: impl IntoIterator<Item = OsString>) -> io::Resul
             })?;
         }
         "set-auto" => set_auto_mode_direct()?,
+        "set-manual-both" => {
+            let Some(cpu_percent) = args
+                .next()
+                .and_then(|value| value.into_string().ok())
+                .and_then(|value| value.parse::<u8>().ok())
+            else {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "expected CPU fan percent from 0 to 100",
+                ));
+            };
+
+            let Some(gpu_percent) = args
+                .next()
+                .and_then(|value| value.into_string().ok())
+                .and_then(|value| value.parse::<u8>().ok())
+            else {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "expected GPU fan percent from 0 to 100",
+                ));
+            };
+
+            set_manual_speeds_direct(cpu_percent, gpu_percent)?;
+        }
         "set-manual" => {
             let Some(fan) = args
                 .next()
@@ -128,10 +147,22 @@ pub fn handle_helper_args(args: impl IntoIterator<Item = OsString>) -> io::Resul
     Ok(true)
 }
 
+fn set_manual_speeds_direct(cpu_percent: u8, gpu_percent: u8) -> io::Result<()> {
+    let hwmon_path = discover_acer_hwmon(HWMON_ROOT)?
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "acer hwmon adapter not found"))?;
+
+    set_manual_speed_at_path(&hwmon_path, FanId::Cpu, cpu_percent)?;
+    set_manual_speed_at_path(&hwmon_path, FanId::Gpu, gpu_percent)
+}
+
 fn set_manual_speed_direct(fan: FanId, percent: u8) -> io::Result<()> {
     let hwmon_path = discover_acer_hwmon(HWMON_ROOT)?
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "acer hwmon adapter not found"))?;
 
+    set_manual_speed_at_path(&hwmon_path, fan, percent)
+}
+
+fn set_manual_speed_at_path(hwmon_path: &Path, fan: FanId, percent: u8) -> io::Result<()> {
     let index = fan.pwm_index();
     write_direct_hwmon_value(hwmon_path.join(format!("pwm{index}_enable")), 1)?;
     write_direct_hwmon_value(
