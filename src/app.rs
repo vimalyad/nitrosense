@@ -437,8 +437,6 @@ impl NitroSenseApp {
         ui.horizontal_wrapped(|ui| {
             ui.checkbox(&mut self.graph_visibility.cpu_temp, "CPU Temp");
             ui.checkbox(&mut self.graph_visibility.gpu_temp, "GPU Temp");
-            ui.checkbox(&mut self.graph_visibility.cpu_fan, "CPU Fan");
-            ui.checkbox(&mut self.graph_visibility.gpu_fan, "GPU Fan");
         });
         ui.add_space(8.0);
         show_graph(ui, &self.graph_history, &self.graph_visibility);
