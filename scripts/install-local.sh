@@ -10,6 +10,7 @@ ICON_DIR="${DATA_DIR}/icons/hicolor"
 POLKIT_ACTION_DIR="/usr/share/polkit-1/actions"
 POLKIT_ACTION_ID="io.github.vimalyad.nitrosense.fan-control"
 POLKIT_POLICY="${POLKIT_ACTION_DIR}/${POLKIT_ACTION_ID}.policy"
+POLKIT_POLICY_TEMPLATE="packaging/io.github.vimalyad.nitrosense.policy.in"
 
 case "${BUILD_PROFILE}" in
   release)
@@ -46,7 +47,7 @@ policy_file="$(mktemp)"
 trap 'rm -f "${policy_file}"' EXIT
 escaped_binary="$(printf '%s' "${BIN_DIR}/${APP_NAME}" | sed 's/[\/&]/\\&/g')"
 sed "s/@NITROSENSE_EXEC@/${escaped_binary}/g" \
-  "packaging/${POLKIT_ACTION_ID}.policy.in" > "${policy_file}"
+  "${POLKIT_POLICY_TEMPLATE}" > "${policy_file}"
 sudo install -Dm644 "${policy_file}" "${POLKIT_POLICY}"
 
 echo "Installed ${BIN_DIR}/${APP_NAME}"
