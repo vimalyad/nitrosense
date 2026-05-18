@@ -1,6 +1,7 @@
 use std::fs;
 use std::io;
 use std::path::Path;
+use std::process::{Command, Stdio};
 
 const PLATFORM_PROFILE_PATH: &str = "/sys/firmware/acpi/platform_profile";
 const PLATFORM_PROFILE_CHOICES_PATH: &str = "/sys/firmware/acpi/platform_profile_choices";
@@ -22,6 +23,43 @@ pub fn read_active_profile() -> io::Result<Option<PowerProfile>> {
 
 pub fn read_profile_choices() -> io::Result<Vec<PowerProfile>> {
     read_profile_choices_from(PLATFORM_PROFILE_CHOICES_PATH)
+}
+
+pub fn set_active_profile(profile: &str) -> io::Result<()> {
+    set_active_profile_at(PLATFORM_PROFILE_PATH, profile)
+}
+
+fn set_active_profile_at(path: &str, profile: &str) -> io::Result<()> {
+    let mut child = Command::new("sudo")
+        .arg("-n")
+        .arg("tee")
+        .arg(path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        stdin.write_all(profile.as_bytes())?;
+        stdin.write_all(b"\n")?;
+    }
+
+    let output = child.wait_with_output()?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let error = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+        Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            if error.is_empty() {
+                "failed to write platform profile with sudo tee".to_owned()
+            } else {
+                error
+            },
+        ))
+    }
 }
 
 fn read_active_profile_from(path: impl AsRef<Path>) -> io::Result<Option<PowerProfile>> {
@@ -85,6 +123,17 @@ mod tests {
                 PowerProfile::new("performance"),
             ]
         );
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn empty_choices_file_returns_no_profiles() {
+        let path = unique_test_file("empty-profile-choices");
+        fs::write(&path, "\n").unwrap();
+
+        let choices = read_profile_choices_from(&path).unwrap();
+
+        assert!(choices.is_empty());
         fs::remove_file(path).unwrap();
     }
 

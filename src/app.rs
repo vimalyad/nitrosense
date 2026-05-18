@@ -5,6 +5,7 @@ use tokio::sync::watch;
 
 use crate::graph::{show_graph, GraphHistory, GraphVisibility};
 use crate::polling::{spawn_sensor_polling, SensorSnapshot};
+use crate::profile::{self, PowerProfile};
 use crate::sensors::SensorData;
 
 pub fn run() -> Result<()> {
@@ -43,6 +44,8 @@ struct NitroSenseApp {
     sensor_snapshot: SensorSnapshot,
     graph_history: GraphHistory,
     graph_visibility: GraphVisibility,
+    profile_choices: Vec<PowerProfile>,
+    profile_status: Option<String>,
     active_tab: AppTab,
 }
 
@@ -63,6 +66,8 @@ impl NitroSenseApp {
             sensor_snapshot,
             graph_history,
             graph_visibility: GraphVisibility::default(),
+            profile_choices: profile::read_profile_choices().unwrap_or_default(),
+            profile_status: None,
             active_tab: AppTab::Overview,
         }
     }
@@ -111,7 +116,7 @@ impl NitroSenseApp {
         });
     }
 
-    fn show_power_profile(&self, ui: &mut egui::Ui) {
+    fn show_power_profile(&mut self, ui: &mut egui::Ui) {
         ui.group(|ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.strong("Power Profile");
@@ -126,17 +131,63 @@ impl NitroSenseApp {
 
             ui.add_space(6.0);
             ui.horizontal_wrapped(|ui| {
-                for profile in ["Low Power", "Quiet", "Balanced", "Balanced+", "Performance"] {
+                let choices: Vec<String> = if self.profile_choices.is_empty() {
+                    fallback_profile_names()
+                } else {
+                    self.profile_choices
+                        .iter()
+                        .map(|profile| profile.name.clone())
+                        .collect()
+                };
+
+                for profile_name in choices {
                     let active = self
                         .sensor_data()
                         .active_power_profile
                         .as_deref()
-                        .map(|current| current.eq_ignore_ascii_case(profile))
+                        .map(|current| current.eq_ignore_ascii_case(&profile_name))
                         .unwrap_or(false);
-                    ui.add_enabled(false, egui::SelectableLabel::new(active, profile));
+
+                    let available = self.profile_choices.is_empty()
+                        || self
+                            .profile_choices
+                            .iter()
+                            .any(|profile| profile.name == profile_name);
+
+                    if ui
+                        .add_enabled(
+                            available,
+                            egui::SelectableLabel::new(active, display_profile_name(&profile_name)),
+                        )
+                        .clicked()
+                    {
+                        self.set_power_profile(profile_name);
+                    }
                 }
             });
+
+            if let Some(status) = &self.profile_status {
+                ui.add_space(6.0);
+                ui.label(status);
+            }
         });
+    }
+
+    fn set_power_profile(&mut self, profile_name: String) {
+        match profile::set_active_profile(&profile_name) {
+            Ok(()) => {
+                self.profile_status = Some(format!(
+                    "Requested {} profile.",
+                    display_profile_name(&profile_name)
+                ));
+            }
+            Err(error) => {
+                self.profile_status = Some(format!(
+                    "Could not set {}: {error}",
+                    display_profile_name(&profile_name)
+                ));
+            }
+        }
     }
 
     fn show_stats(&self, ui: &mut egui::Ui) {
@@ -314,4 +365,32 @@ fn format_voltage(value: Option<f32>) -> String {
     value
         .map(|voltage| format!("{voltage:.2} V"))
         .unwrap_or_else(|| "Unavailable".to_owned())
+}
+
+fn fallback_profile_names() -> Vec<String> {
+    [
+        "low-power",
+        "quiet",
+        "balanced",
+        "balanced-performance",
+        "performance",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect()
+}
+
+fn display_profile_name(profile_name: &str) -> String {
+    profile_name
+        .split(['-', '_'])
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().chain(chars).collect::<String>(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
