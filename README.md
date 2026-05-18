@@ -69,6 +69,14 @@ Run:
 ./target/release/nitrosense
 ```
 
+Create a release archive:
+
+```bash
+scripts/package-release.sh 0.1.0-alpha
+```
+
+The generated `.tar.gz` and checksum are written to `dist/`.
+
 ## Fedora Setup
 
 Default build dependencies:

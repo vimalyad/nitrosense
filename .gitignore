@@ -1,6 +1,8 @@
 /target
+/dist
 PROJECT.md
 CHANGES.md
 implementation.md
+release.md
 external/
 official_app/
