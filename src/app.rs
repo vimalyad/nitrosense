@@ -3,6 +3,7 @@ use eframe::egui;
 use tokio::runtime::Runtime;
 use tokio::sync::watch;
 
+use crate::graph::{show_graph, GraphHistory, GraphVisibility};
 use crate::polling::{spawn_sensor_polling, SensorSnapshot};
 use crate::sensors::SensorData;
 
@@ -40,6 +41,8 @@ struct NitroSenseApp {
     _runtime: Runtime,
     sensor_receiver: watch::Receiver<SensorSnapshot>,
     sensor_snapshot: SensorSnapshot,
+    graph_history: GraphHistory,
+    graph_visibility: GraphVisibility,
     active_tab: AppTab,
 }
 
@@ -51,10 +54,15 @@ impl NitroSenseApp {
     ) -> Self {
         let sensor_snapshot = sensor_receiver.borrow().clone();
 
+        let mut graph_history = GraphHistory::new();
+        graph_history.push(std::time::Instant::now(), &sensor_snapshot.data);
+
         Self {
             _runtime: runtime,
             sensor_receiver,
             sensor_snapshot,
+            graph_history,
+            graph_visibility: GraphVisibility::default(),
             active_tab: AppTab::Overview,
         }
     }
@@ -85,6 +93,8 @@ impl NitroSenseApp {
     fn refresh_sensor_snapshot(&mut self) {
         if self.sensor_receiver.has_changed().unwrap_or(false) {
             self.sensor_snapshot = self.sensor_receiver.borrow_and_update().clone();
+            self.graph_history
+                .push(std::time::Instant::now(), &self.sensor_snapshot.data);
         }
     }
 
@@ -226,7 +236,7 @@ impl NitroSenseApp {
         });
     }
 
-    fn show_active_tab(&self, ui: &mut egui::Ui) {
+    fn show_active_tab(&mut self, ui: &mut egui::Ui) {
         match self.active_tab {
             AppTab::Overview => self.show_overview_tab(ui),
             AppTab::Graph => self.show_graph_tab(ui),
@@ -246,10 +256,17 @@ impl NitroSenseApp {
         ));
     }
 
-    fn show_graph_tab(&self, ui: &mut egui::Ui) {
+    fn show_graph_tab(&mut self, ui: &mut egui::Ui) {
         ui.heading("Graph");
         ui.add_space(8.0);
-        ui.label("Graph data will appear after the polling and graph phases are wired.");
+        ui.horizontal_wrapped(|ui| {
+            ui.checkbox(&mut self.graph_visibility.cpu_temp, "CPU Temp");
+            ui.checkbox(&mut self.graph_visibility.gpu_temp, "GPU Temp");
+            ui.checkbox(&mut self.graph_visibility.cpu_fan, "CPU Fan");
+            ui.checkbox(&mut self.graph_visibility.gpu_fan, "GPU Fan");
+        });
+        ui.add_space(8.0);
+        show_graph(ui, &self.graph_history, &self.graph_visibility);
     }
 
     fn show_fan_control_tab(&self, ui: &mut egui::Ui) {
