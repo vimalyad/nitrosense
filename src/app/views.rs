@@ -6,7 +6,6 @@ use crate::app::formatting::{
     format_voltage,
 };
 use crate::graph::show_graph;
-use crate::hardware::fan_control::FanControlStatus;
 use crate::ui::theme::{accent_color, panel_frame, warning_color};
 use crate::ui::widgets::{compact_metric, fan_dashboard_panel, fan_slider_row, nav_button};
 
@@ -338,32 +337,35 @@ impl NitroSenseApp {
         panel_frame().show(ui, |ui| {
             let cpu_fan_rpm = self.sensor_data().cpu_fan_rpm;
             let gpu_fan_rpm = self.sensor_data().gpu_fan_rpm;
+            let controls_enabled = self.fan_control_status.can_control();
 
-            fan_slider_row(ui, "CPU Fan", &mut self.cpu_fan_percent, cpu_fan_rpm);
+            let cpu_changed = fan_slider_row(
+                ui,
+                "CPU Fan",
+                &mut self.cpu_fan_percent,
+                cpu_fan_rpm,
+                controls_enabled,
+            );
             ui.add_space(8.0);
-            fan_slider_row(ui, "GPU Fan", &mut self.gpu_fan_percent, gpu_fan_rpm);
+            let gpu_changed = fan_slider_row(
+                ui,
+                "GPU Fan",
+                &mut self.gpu_fan_percent,
+                gpu_fan_rpm,
+                controls_enabled,
+            );
+
+            if controls_enabled && (cpu_changed || gpu_changed) {
+                self.schedule_fan_speed_apply(ui.ctx());
+            }
 
             ui.add_space(12.0);
             ui.horizontal(|ui| {
-                let controls_enabled = self.fan_control_status.can_control();
-
-                if ui
-                    .add_enabled(controls_enabled, egui::Button::new("Apply"))
-                    .clicked()
-                {
-                    self.apply_manual_fan_speeds();
-                }
-
                 if ui
                     .add_enabled(controls_enabled, egui::Button::new("Auto"))
                     .clicked()
                 {
                     self.restore_auto_fan_control();
-                }
-
-                if ui.button("Refresh Status").clicked() {
-                    self.fan_control_status = FanControlStatus::detect();
-                    self.fan_control_message = Some("Fan control status refreshed.".to_owned());
                 }
             });
         });

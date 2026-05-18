@@ -74,18 +74,33 @@ pub fn fan_activity_bar(ui: &mut egui::Ui, label: &str, rpm: Option<u32>) {
     );
 }
 
-pub fn fan_slider_row(ui: &mut egui::Ui, label: &str, percent: &mut u8, rpm: Option<u32>) {
+pub fn fan_slider_row(
+    ui: &mut egui::Ui,
+    label: &str,
+    percent: &mut u8,
+    rpm: Option<u32>,
+    enabled: bool,
+) -> bool {
+    let mut changed = false;
+
     ui.horizontal(|ui| {
         ui.set_min_height(32.0);
         ui.label(label);
 
         let mut value = *percent as f32;
-        ui.add(egui::Slider::new(&mut value, 0.0..=100.0).show_value(false));
-        *percent = value.round().clamp(0.0, 100.0) as u8;
+        let response = ui.add_enabled(
+            enabled,
+            egui::Slider::new(&mut value, 0.0..=100.0).show_value(false),
+        );
+        let next_percent = value.round().clamp(0.0, 100.0) as u8;
+        changed = response.changed() && *percent != next_percent;
+        *percent = next_percent;
 
         ui.label(format!("{}%", *percent));
         ui.label(format_rpm(rpm));
     });
+
+    changed
 }
 
 fn draw_fan_badge(ui: &mut egui::Ui, rpm: Option<u32>) {

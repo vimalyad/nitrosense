@@ -44,12 +44,22 @@ ls /sys/class/hwmon/hwmon*/pwm*
 ```
 
 The app writes `pwm1`, `pwm2`, `pwm1_enable`, and `pwm2_enable` through
-`sudo -n tee`. Because the exact `hwmonN` index can change across boots, create
-a sudoers rule after replacing `hwmon5` with the current Acer hwmon directory:
+`sudo -n tee`. The `-n` flag is intentional: the GUI does not open a password
+prompt. If sudoers is not configured, fan updates fail with
+`sudo: a password is required`.
+
+Because the exact `hwmonN` index can change across boots, create a sudoers rule
+after replacing `hwmon5` with the current Acer hwmon directory:
 
 ```bash
 echo "vimal2907 ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/class/hwmon/hwmon5/pwm1, /usr/bin/tee /sys/class/hwmon/hwmon5/pwm1_enable, /usr/bin/tee /sys/class/hwmon/hwmon5/pwm2, /usr/bin/tee /sys/class/hwmon/hwmon5/pwm2_enable" \
   | sudo tee /etc/sudoers.d/nitrosense-fans
+```
+
+Validate the rule:
+
+```bash
+printf '1\n' | sudo -n tee /sys/class/hwmon/hwmon5/pwm1_enable
 ```
 
 ## Desktop Entry

@@ -114,6 +114,9 @@ sudo -n tee /sys/class/hwmon/hwmon*/pwm2_enable
 sudo -n tee /sys/class/hwmon/hwmon*/pwm2
 ```
 
+The app uses non-interactive `sudo -n`; configure the exact NOPASSWD sudoers
+rules from [docs/setup.md](docs/setup.md) before using fan control from the GUI.
+
 Use these controls carefully. Fan control and power profile changes are hardware
 touchpoints, so validate setup on your own machine before relying on the app.
 

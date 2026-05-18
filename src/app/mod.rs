@@ -3,6 +3,7 @@ mod views;
 
 use anyhow::{anyhow, Result};
 use eframe::egui;
+use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
 use tokio::sync::watch;
 
@@ -60,6 +61,8 @@ struct NitroSenseApp {
     fan_control_status: FanControlStatus,
     cpu_fan_percent: u8,
     gpu_fan_percent: u8,
+    pending_fan_apply_at: Option<Instant>,
+    last_fan_status_refresh: Instant,
     fan_control_message: Option<String>,
     app_config: AppConfig,
     thermal_alerts: ThermalAlertState,
@@ -108,6 +111,8 @@ impl NitroSenseApp {
             fan_control_status: FanControlStatus::detect(),
             cpu_fan_percent: 50,
             gpu_fan_percent: 50,
+            pending_fan_apply_at: None,
+            last_fan_status_refresh: Instant::now(),
             fan_control_message: None,
             app_config: AppConfig::default(),
             thermal_alerts: ThermalAlertState::default(),
@@ -124,6 +129,8 @@ impl eframe::App for NitroSenseApp {
     fn update(&mut self, context: &egui::Context, _frame: &mut eframe::Frame) {
         apply_nitro_style(context);
         self.refresh_sensor_snapshot();
+        self.refresh_fan_control_status();
+        self.apply_pending_fan_speeds(context);
         self.handle_window_close_request(context);
         self.handle_tray_action(context);
 
@@ -168,6 +175,13 @@ impl NitroSenseApp {
                 .push(std::time::Instant::now(), &self.sensor_snapshot.data);
             self.update_tray();
             self.process_thermal_alerts();
+        }
+    }
+
+    fn refresh_fan_control_status(&mut self) {
+        if self.last_fan_status_refresh.elapsed() >= Duration::from_secs(1) {
+            self.fan_control_status = FanControlStatus::detect();
+            self.last_fan_status_refresh = Instant::now();
         }
     }
 
@@ -258,6 +272,7 @@ impl NitroSenseApp {
         let cpu_result = fan_control::set_manual_speed(FanId::Cpu, self.cpu_fan_percent);
         let gpu_result = fan_control::set_manual_speed(FanId::Gpu, self.gpu_fan_percent);
 
+        let failed = cpu_result.is_err() || gpu_result.is_err();
         self.fan_control_message = match (cpu_result, gpu_result) {
             (Ok(()), Ok(())) => Some(format!(
                 "Applied CPU {}% and GPU {}%.",
@@ -269,6 +284,13 @@ impl NitroSenseApp {
                 "CPU fan update failed: {cpu_error}; GPU fan update failed: {gpu_error}"
             )),
         };
+
+        if failed {
+            self.restore_auto_fan_control_after_failed_manual_update();
+        }
+
+        self.fan_control_status = FanControlStatus::detect();
+        self.last_fan_status_refresh = Instant::now();
     }
 
     fn restore_auto_fan_control(&mut self) {
@@ -276,6 +298,44 @@ impl NitroSenseApp {
             Ok(()) => Some("Restored automatic fan control.".to_owned()),
             Err(error) => Some(format!("Could not restore automatic fan control: {error}")),
         };
+        self.pending_fan_apply_at = None;
+        self.fan_control_status = FanControlStatus::detect();
+        self.last_fan_status_refresh = Instant::now();
+    }
+
+    fn restore_auto_fan_control_after_failed_manual_update(&mut self) {
+        let manual_error = self
+            .fan_control_message
+            .take()
+            .unwrap_or_else(|| "Fan update failed for an unknown reason.".to_owned());
+
+        self.fan_control_message = match fan_control::set_auto_mode() {
+            Ok(()) => Some(format!("{manual_error}; restored automatic fan control.")),
+            Err(auto_error) => Some(format!(
+                "{manual_error}; automatic restore also failed: {auto_error}"
+            )),
+        };
+    }
+
+    fn schedule_fan_speed_apply(&mut self, context: &egui::Context) {
+        let delay = Duration::from_secs(3);
+        self.pending_fan_apply_at = Some(Instant::now() + delay);
+        self.fan_control_message = Some("Fan speed change pending.".to_owned());
+        context.request_repaint_after(delay);
+    }
+
+    fn apply_pending_fan_speeds(&mut self, context: &egui::Context) {
+        let Some(apply_at) = self.pending_fan_apply_at else {
+            return;
+        };
+
+        let now = Instant::now();
+        if now >= apply_at {
+            self.pending_fan_apply_at = None;
+            self.apply_manual_fan_speeds();
+        } else {
+            context.request_repaint_after(apply_at - now);
+        }
     }
 }
 
