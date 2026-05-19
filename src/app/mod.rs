@@ -18,13 +18,17 @@ use crate::services::polling::{spawn_sensor_polling, SensorSnapshot};
 use crate::services::tray::{state_for_cpu_temp, TrayAction, TrayController};
 use crate::ui::theme::{app_background_color, apply_nitro_style, sidebar_color};
 
+const NOTIFICATION_STATUS_TTL: Duration = Duration::from_secs(30);
+
 pub fn run() -> Result<()> {
     let runtime = Runtime::new()?;
     let sensor_receiver = spawn_sensor_polling(runtime.handle());
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([920.0, 640.0])
+            .with_inner_size([920.0, 600.0])
+            .with_resizable(false)
+            .with_maximize_button(false)
             .with_icon(load_window_icon()?),
         ..Default::default()
     };
@@ -67,6 +71,7 @@ struct NitroSenseApp {
     app_config: AppConfig,
     thermal_alerts: ThermalAlertState,
     notification_status: Option<String>,
+    notification_status_at: Option<Instant>,
     tray_controller: TrayController,
     window_hidden_to_tray: bool,
     allow_window_close: bool,
@@ -127,6 +132,7 @@ impl NitroSenseApp {
             app_config: AppConfig::default(),
             thermal_alerts: ThermalAlertState::default(),
             notification_status: None,
+            notification_status_at: None,
             tray_controller,
             window_hidden_to_tray: false,
             allow_window_close: false,
@@ -141,6 +147,7 @@ impl eframe::App for NitroSenseApp {
         apply_nitro_style(context);
         self.refresh_sensor_snapshot();
         self.refresh_fan_control_status();
+        self.clear_stale_notification_status();
         self.apply_pending_fan_speeds(context);
         self.handle_window_close_request(context);
         self.handle_tray_action(context);
@@ -167,10 +174,6 @@ impl eframe::App for NitroSenseApp {
                             ui.add_space(14.0);
                             self.show_status_strip(ui);
                             ui.add_space(14.0);
-                            self.show_polling_status(ui);
-                            self.show_notification_status(ui);
-                            self.show_tray_status(ui);
-                            ui.add_space(8.0);
                             self.show_active_tab(ui);
                         });
                     });
@@ -249,12 +252,24 @@ impl NitroSenseApp {
                         alert.kind.title(),
                         alert.message()
                     ));
+                    self.notification_status_at = Some(now);
                 }
                 Err(error) => {
                     self.notification_status =
                         Some(format!("Could not send thermal notification: {error}"));
+                    self.notification_status_at = Some(now);
                 }
             }
+        }
+    }
+
+    fn clear_stale_notification_status(&mut self) {
+        if self
+            .notification_status_at
+            .is_some_and(|sent_at| sent_at.elapsed() >= NOTIFICATION_STATUS_TTL)
+        {
+            self.notification_status = None;
+            self.notification_status_at = None;
         }
     }
 

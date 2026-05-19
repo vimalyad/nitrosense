@@ -107,12 +107,15 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
         .map(|sample| sample.sampled_wall_time)
         .unwrap_or_else(SystemTime::now);
 
+    let plot_width = ui.available_width().min(700.0);
+
     Plot::new("temperature_graph")
         .legend(
             Legend::default()
                 .position(Corner::LeftTop)
                 .background_alpha(0.9),
         )
+        .width(plot_width)
         .height(360.0)
         .y_axis_label("Celsius")
         .include_x(-(GRAPH_DATA_WINDOW.as_secs_f64()))

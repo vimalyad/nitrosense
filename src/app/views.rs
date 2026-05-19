@@ -56,7 +56,7 @@ impl NitroSenseApp {
         nav_button(ui, &mut self.active_tab, AppTab::Graph, "Temperature");
         nav_button(ui, &mut self.active_tab, AppTab::FanControl, "Fan Control");
 
-        let footer_gap = (ui.available_height() - 52.0).max(16.0);
+        let footer_gap = (ui.available_height() - 148.0).max(16.0);
         ui.add_space(footer_gap);
         ui.label(egui::RichText::new("Current profile").small().weak());
         ui.label(
@@ -68,6 +68,11 @@ impl NitroSenseApp {
             )
             .color(egui::Color32::from_rgb(190, 196, 202)),
         );
+        ui.add_space(8.0);
+        self.show_polling_status(ui);
+        self.show_notification_status(ui);
+        self.show_tray_status(ui);
+        ui.add_space(12.0);
     }
 
     pub(super) fn show_status_strip(&mut self, ui: &mut egui::Ui) {
@@ -99,6 +104,7 @@ impl NitroSenseApp {
 
     pub(super) fn show_power_profile(&mut self, ui: &mut egui::Ui) {
         panel_frame().show(ui, |ui| {
+            ui.set_width(ui.available_width());
             ui.horizontal_wrapped(|ui| {
                 ui.label(
                     egui::RichText::new("Power Profile")
@@ -159,7 +165,7 @@ impl NitroSenseApp {
 
     pub(super) fn show_stats(&self, ui: &mut egui::Ui) {
         egui::Grid::new("stats_grid")
-            .num_columns(3)
+            .num_columns(2)
             .spacing([12.0, 12.0])
             .show(ui, |ui| {
                 self.stat_card(
@@ -174,20 +180,22 @@ impl NitroSenseApp {
                     format_temperature(self.sensor_data().nvidia_gpu_temp_celsius),
                     "Discrete",
                 );
+                ui.end_row();
+
                 self.stat_card(
                     ui,
                     "NVMe",
                     format_temperature(self.sensor_data().nvme_temp_celsius),
                     "Storage",
                 );
-                ui.end_row();
-
                 self.stat_card(
                     ui,
                     "CPU Fan",
                     format_rpm(self.sensor_data().cpu_fan_rpm),
                     "Fan 1",
                 );
+                ui.end_row();
+
                 self.stat_card(
                     ui,
                     "GPU Fan",
@@ -211,33 +219,30 @@ impl NitroSenseApp {
                         .unwrap_or_else(|| "Unavailable".to_owned()),
                     "Platform",
                 );
-                ui.label("");
-                ui.label("");
                 ui.end_row();
             });
     }
 
     pub(super) fn show_polling_status(&self, ui: &mut egui::Ui) {
         if let Some(error) = &self.sensor_snapshot.last_error {
-            ui.add_space(8.0);
             ui.colored_label(
                 egui::Color32::from_rgb(180, 90, 40),
-                format!("Sensor polling issue: {error}"),
+                egui::RichText::new(format!("Sensor issue: {error}"))
+                    .small()
+                    .weak(),
             );
         }
     }
 
     pub(super) fn show_tray_status(&self, ui: &mut egui::Ui) {
         if self.window_hidden_to_tray {
-            ui.add_space(8.0);
-            ui.label("Window hidden to tray.");
+            ui.label(egui::RichText::new("Window hidden to tray.").small().weak());
         }
     }
 
     pub(super) fn show_notification_status(&self, ui: &mut egui::Ui) {
         if let Some(status) = &self.notification_status {
-            ui.add_space(8.0);
-            ui.label(status);
+            ui.label(egui::RichText::new(status).small().weak());
         }
     }
 
@@ -245,7 +250,8 @@ impl NitroSenseApp {
         panel_frame()
             .inner_margin(egui::Margin::symmetric(12.0, 10.0))
             .show(ui, |ui| {
-                ui.set_min_width(150.0);
+                ui.set_min_width(180.0);
+                ui.set_max_width(180.0);
                 ui.label(egui::RichText::new(title).strong().color(accent_color()));
                 ui.add_space(4.0);
                 ui.label(
@@ -267,24 +273,33 @@ impl NitroSenseApp {
     }
 
     fn show_overview_tab(&self, ui: &mut egui::Ui) {
-        ui.columns(2, |columns| {
-            columns[0].heading("Monitoring");
-            columns[0].add_space(8.0);
-            self.show_stats(&mut columns[0]);
+        ui.horizontal_top(|ui| {
+            ui.vertical(|ui| {
+                ui.set_max_width(392.0);
+                ui.heading("Monitoring");
+                ui.add_space(8.0);
+                self.show_stats(ui);
+            });
 
-            columns[1].heading("Cooling");
-            columns[1].add_space(8.0);
-            fan_dashboard_panel(&mut columns[1], "CPU Fan", self.sensor_data().cpu_fan_rpm);
-            columns[1].add_space(10.0);
-            fan_dashboard_panel(&mut columns[1], "GPU Fan", self.sensor_data().gpu_fan_rpm);
-            columns[1].add_space(10.0);
-            panel_frame().show(&mut columns[1], |ui| {
-                ui.label(
-                    egui::RichText::new("Battery")
-                        .strong()
-                        .color(accent_color()),
-                );
-                ui.label(format_voltage(self.sensor_data().battery_voltage));
+            ui.add_space(18.0);
+
+            ui.vertical(|ui| {
+                ui.set_width(280.0);
+                ui.heading("Cooling");
+                ui.add_space(8.0);
+                fan_dashboard_panel(ui, "CPU Fan", self.sensor_data().cpu_fan_rpm);
+                ui.add_space(10.0);
+                fan_dashboard_panel(ui, "GPU Fan", self.sensor_data().gpu_fan_rpm);
+                ui.add_space(10.0);
+                panel_frame().show(ui, |ui| {
+                    ui.set_width(252.0);
+                    ui.label(
+                        egui::RichText::new("Battery")
+                            .strong()
+                            .color(accent_color()),
+                    );
+                    ui.label(format_voltage(self.sensor_data().battery_voltage));
+                });
             });
         });
     }
@@ -292,14 +307,24 @@ impl NitroSenseApp {
     fn show_graph_tab(&mut self, ui: &mut egui::Ui) {
         ui.heading("Temperature");
         ui.add_space(8.0);
-        panel_frame().show(ui, |ui| {
-            ui.horizontal_wrapped(|ui| {
-                ui.checkbox(&mut self.graph_visibility.cpu_temp, "CPU Temp");
-                ui.checkbox(&mut self.graph_visibility.gpu_temp, "GPU Temp");
-            });
-            ui.add_space(8.0);
-            show_graph(ui, &self.graph_history, &self.graph_visibility);
-        });
+        let panel_width = ui.available_width().min(704.0);
+
+        ui.allocate_ui_with_layout(
+            egui::vec2(panel_width, 0.0),
+            egui::Layout::top_down(egui::Align::Min),
+            |ui| {
+                ui.set_max_width(panel_width);
+                panel_frame().show(ui, |ui| {
+                    ui.set_max_width((panel_width - 28.0).max(0.0));
+                    ui.horizontal_wrapped(|ui| {
+                        ui.checkbox(&mut self.graph_visibility.cpu_temp, "CPU Temp");
+                        ui.checkbox(&mut self.graph_visibility.gpu_temp, "GPU Temp");
+                    });
+                    ui.add_space(8.0);
+                    show_graph(ui, &self.graph_history, &self.graph_visibility);
+                });
+            },
+        );
     }
 
     fn show_fan_control_tab(&mut self, ui: &mut egui::Ui) {
@@ -307,6 +332,7 @@ impl NitroSenseApp {
         ui.add_space(8.0);
 
         panel_frame().show(ui, |ui| {
+            ui.set_width(ui.available_width());
             if let Some(path) = &self.fan_control_status.acer_hwmon_path {
                 ui.label(format!("Acer hwmon: {}", path.display()));
             } else {
@@ -335,6 +361,7 @@ impl NitroSenseApp {
 
         ui.add_space(10.0);
         panel_frame().show(ui, |ui| {
+            ui.set_width(ui.available_width());
             let cpu_fan_rpm = self.sensor_data().cpu_fan_rpm;
             let gpu_fan_rpm = self.sensor_data().gpu_fan_rpm;
             let controls_enabled = self.fan_control_status.can_control();

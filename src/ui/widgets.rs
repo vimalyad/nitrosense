@@ -55,23 +55,18 @@ pub fn fan_dashboard_panel(ui: &mut egui::Ui, label: &str, rpm: Option<u32>) {
                         .size(22.0)
                         .color(egui::Color32::WHITE),
                 );
-                fan_activity_bar(ui, label, rpm);
+                fan_activity_bar(ui, rpm);
             });
         });
     });
 }
 
-pub fn fan_activity_bar(ui: &mut egui::Ui, label: &str, rpm: Option<u32>) {
+pub fn fan_activity_bar(ui: &mut egui::Ui, rpm: Option<u32>) {
     let fraction = rpm
         .map(|value| (value as f32 / 6_500.0).clamp(0.0, 1.0))
         .unwrap_or(0.0);
-    let text = format!("{label}: {}", format_rpm(rpm));
 
-    ui.add(
-        egui::ProgressBar::new(fraction)
-            .desired_width(360.0)
-            .text(text),
-    );
+    ui.add(egui::ProgressBar::new(fraction).desired_width(360.0));
 }
 
 pub fn fan_slider_row(
@@ -85,19 +80,23 @@ pub fn fan_slider_row(
 
     ui.horizontal(|ui| {
         ui.set_min_height(32.0);
-        ui.label(label);
+        ui.add_sized([70.0, 20.0], egui::Label::new(label));
 
         let mut value = *percent as f32;
-        let response = ui.add_enabled(
-            enabled,
-            egui::Slider::new(&mut value, 0.0..=100.0).show_value(false),
-        );
+        let slider_width = (ui.available_width() - 130.0).max(220.0);
+        let response = ui.add_enabled_ui(enabled, |ui| {
+            ui.add_sized(
+                [slider_width, 20.0],
+                egui::Slider::new(&mut value, 0.0..=100.0).show_value(false),
+            )
+        });
+        let response = response.inner;
         let next_percent = value.round().clamp(0.0, 100.0) as u8;
         changed = response.changed() && *percent != next_percent;
         *percent = next_percent;
 
-        ui.label(format!("{}%", *percent));
-        ui.label(format_rpm(rpm));
+        ui.add_sized([44.0, 20.0], egui::Label::new(format!("{}%", *percent)));
+        ui.add_sized([78.0, 20.0], egui::Label::new(format_rpm(rpm)));
     });
 
     changed
