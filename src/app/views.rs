@@ -250,8 +250,8 @@ impl NitroSenseApp {
         panel_frame()
             .inner_margin(egui::Margin::symmetric(12.0, 10.0))
             .show(ui, |ui| {
-                ui.set_min_width(180.0);
-                ui.set_max_width(180.0);
+                ui.set_min_width(168.0);
+                ui.set_max_width(168.0);
                 ui.label(egui::RichText::new(title).strong().color(accent_color()));
                 ui.add_space(4.0);
                 ui.label(
@@ -275,7 +275,7 @@ impl NitroSenseApp {
     fn show_overview_tab(&self, ui: &mut egui::Ui) {
         ui.horizontal_top(|ui| {
             ui.vertical(|ui| {
-                ui.set_max_width(392.0);
+                ui.set_width(380.0);
                 ui.heading("Monitoring");
                 ui.add_space(8.0);
                 self.show_stats(ui);
@@ -284,7 +284,7 @@ impl NitroSenseApp {
             ui.add_space(18.0);
 
             ui.vertical(|ui| {
-                ui.set_width(280.0);
+                ui.set_width(290.0);
                 ui.heading("Cooling");
                 ui.add_space(8.0);
                 fan_dashboard_panel(ui, "CPU Fan", self.sensor_data().cpu_fan_rpm);
@@ -292,7 +292,7 @@ impl NitroSenseApp {
                 fan_dashboard_panel(ui, "GPU Fan", self.sensor_data().gpu_fan_rpm);
                 ui.add_space(10.0);
                 panel_frame().show(ui, |ui| {
-                    ui.set_width(252.0);
+                    ui.set_width(262.0);
                     ui.label(
                         egui::RichText::new("Battery")
                             .strong()
@@ -307,24 +307,14 @@ impl NitroSenseApp {
     fn show_graph_tab(&mut self, ui: &mut egui::Ui) {
         ui.heading("Temperature");
         ui.add_space(8.0);
-        let panel_width = ui.available_width().min(704.0);
-
-        ui.allocate_ui_with_layout(
-            egui::vec2(panel_width, 0.0),
-            egui::Layout::top_down(egui::Align::Min),
-            |ui| {
-                ui.set_max_width(panel_width);
-                panel_frame().show(ui, |ui| {
-                    ui.set_max_width((panel_width - 28.0).max(0.0));
-                    ui.horizontal_wrapped(|ui| {
-                        ui.checkbox(&mut self.graph_visibility.cpu_temp, "CPU Temp");
-                        ui.checkbox(&mut self.graph_visibility.gpu_temp, "GPU Temp");
-                    });
-                    ui.add_space(8.0);
-                    show_graph(ui, &self.graph_history, &self.graph_visibility);
-                });
-            },
-        );
+        panel_frame().show(ui, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.checkbox(&mut self.graph_visibility.cpu_temp, "CPU Temp");
+                ui.checkbox(&mut self.graph_visibility.gpu_temp, "GPU Temp");
+            });
+            ui.add_space(8.0);
+            show_graph(ui, &self.graph_history, &self.graph_visibility);
+        });
     }
 
     fn show_fan_control_tab(&mut self, ui: &mut egui::Ui) {

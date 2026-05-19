@@ -66,7 +66,7 @@ pub fn fan_activity_bar(ui: &mut egui::Ui, rpm: Option<u32>) {
         .map(|value| (value as f32 / 6_500.0).clamp(0.0, 1.0))
         .unwrap_or(0.0);
 
-    ui.add(egui::ProgressBar::new(fraction).desired_width(360.0));
+    ui.add(egui::ProgressBar::new(fraction).desired_width(ui.available_width()));
 }
 
 pub fn fan_slider_row(
@@ -83,7 +83,7 @@ pub fn fan_slider_row(
         ui.add_sized([70.0, 20.0], egui::Label::new(label));
 
         let mut value = *percent as f32;
-        let slider_width = (ui.available_width() - 130.0).max(220.0);
+        let slider_width = (ui.available_width() - 160.0).max(200.0);
         let response = ui.add_enabled_ui(enabled, |ui| {
             ui.add_sized(
                 [slider_width, 20.0],
@@ -92,11 +92,17 @@ pub fn fan_slider_row(
         });
         let response = response.inner;
         let next_percent = value.round().clamp(0.0, 100.0) as u8;
-        changed = response.changed() && *percent != next_percent;
+        if response.changed() && *percent != next_percent {
+            changed = true;
+        }
         *percent = next_percent;
 
-        ui.add_sized([44.0, 20.0], egui::Label::new(format!("{}%", *percent)));
-        ui.add_sized([78.0, 20.0], egui::Label::new(format_rpm(rpm)));
+        ui.add_sized([50.0, 20.0], egui::Label::new(format!("{}%", *percent)));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.label(
+                egui::RichText::new(format_rpm(rpm)).color(egui::Color32::from_rgb(150, 156, 162)),
+            );
+        });
     });
 
     changed
