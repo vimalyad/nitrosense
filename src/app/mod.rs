@@ -137,6 +137,7 @@ impl NitroSenseApp {
 
 impl eframe::App for NitroSenseApp {
     fn update(&mut self, context: &egui::Context, _frame: &mut eframe::Frame) {
+        context.request_repaint_after(Duration::from_secs(1));
         apply_nitro_style(context);
         self.refresh_sensor_snapshot();
         self.refresh_fan_control_status();
