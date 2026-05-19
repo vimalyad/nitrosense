@@ -1,10 +1,21 @@
-use std::collections::VecDeque;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+mod axis;
+mod history;
+mod hover;
+
+#[cfg(test)]
+mod tests;
+
+use std::time::Duration;
 
 use eframe::egui;
-use egui_plot::{Corner, GridInput, GridMark, Legend, Line, Plot, PlotBounds, PlotPoints};
+use egui_plot::{Corner, Legend, Line, Plot, PlotBounds, PlotPoints};
 
-use crate::hardware::sensors::SensorData;
+use self::axis::{
+    five_minute_x_grid_marks, format_temperature_axis_label, format_time_axis_label,
+    temperature_y_grid_marks,
+};
+pub use self::history::{GraphHistory, GraphSample, GraphVisibility};
+use self::hover::{show_graph_hover_label, temperature_hover_text};
 
 const GRAPH_DATA_WINDOW: Duration = Duration::from_secs(35 * 60);
 const GRAPH_LABEL_WINDOW: Duration = Duration::from_secs(30 * 60);
@@ -13,14 +24,6 @@ const GRAPH_CAPACITY: usize = 35 * 60;
 const HOVER_SAMPLE_TOLERANCE: Duration = Duration::from_secs(2);
 const TEMPERATURE_MIN_CELSIUS: f64 = 0.0;
 const TEMPERATURE_MAX_CELSIUS: f64 = 105.0;
-
-#[derive(Debug, Clone, Copy)]
-struct GraphSample {
-    sampled_at: Instant,
-    sampled_wall_time: SystemTime,
-    cpu_temp_celsius: Option<f32>,
-    gpu_temp_celsius: Option<f32>,
-}
 
 #[derive(Debug, Clone, Copy)]
 enum TemperatureSeries {
@@ -33,59 +36,6 @@ impl TemperatureSeries {
         match self {
             Self::Cpu => egui::Id::new("temperature_graph_cpu"),
             Self::Gpu => egui::Id::new("temperature_graph_gpu"),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct GraphHistory {
-    samples: VecDeque<GraphSample>,
-    capacity: usize,
-}
-
-impl GraphHistory {
-    pub fn new() -> Self {
-        Self {
-            samples: VecDeque::with_capacity(GRAPH_CAPACITY),
-            capacity: GRAPH_CAPACITY,
-        }
-    }
-
-    pub fn push(&mut self, sampled_at: Instant, data: &SensorData) {
-        if self.samples.len() == self.capacity {
-            self.samples.pop_front();
-        }
-
-        self.samples.push_back(GraphSample {
-            sampled_at,
-            sampled_wall_time: SystemTime::now(),
-            cpu_temp_celsius: data.cpu_package_temp_celsius,
-            gpu_temp_celsius: data.nvidia_gpu_temp_celsius,
-        });
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.samples.is_empty()
-    }
-}
-
-impl Default for GraphHistory {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct GraphVisibility {
-    pub cpu_temp: bool,
-    pub gpu_temp: bool,
-}
-
-impl Default for GraphVisibility {
-    fn default() -> Self {
-        Self {
-            cpu_temp: true,
-            gpu_temp: true,
         }
     }
 }
@@ -105,7 +55,7 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
         .samples
         .back()
         .map(|sample| sample.sampled_wall_time)
-        .unwrap_or_else(SystemTime::now);
+        .unwrap_or_else(std::time::SystemTime::now);
 
     Plot::new("temperature_graph")
         .legend(
@@ -219,293 +169,4 @@ fn add_line(
 
 fn clamp_temperature_for_plot(value: f64) -> f64 {
     value.clamp(TEMPERATURE_MIN_CELSIUS, TEMPERATURE_MAX_CELSIUS)
-}
-
-fn temperature_hover_text(
-    history: &GraphHistory,
-    hover_x: f64,
-    visibility: &GraphVisibility,
-) -> Option<String> {
-    let latest_sample = history.samples.back()?;
-    let target_seconds_ago = -hover_x;
-
-    let sample = history
-        .samples
-        .iter()
-        .filter_map(|sample| {
-            let seconds_ago = latest_sample
-                .sampled_at
-                .duration_since(sample.sampled_at)
-                .as_secs_f64();
-
-            let distance_seconds = (seconds_ago - target_seconds_ago).abs();
-            if seconds_ago <= GRAPH_DATA_WINDOW.as_secs_f64()
-                && distance_seconds <= HOVER_SAMPLE_TOLERANCE.as_secs_f64()
-            {
-                Some((sample, distance_seconds))
-            } else {
-                None
-            }
-        })
-        .min_by(|(_, left), (_, right)| left.total_cmp(right))
-        .map(|(sample, _)| sample)?;
-
-    let mut lines = Vec::new();
-
-    lines.push(format!(
-        "Time {}",
-        format_wall_clock_time(sample.sampled_wall_time)
-    ));
-
-    if visibility.cpu_temp {
-        if let Some(cpu_temp) = sample.cpu_temp_celsius {
-            lines.push(format!("CPU {:.1} C", cpu_temp));
-        }
-    }
-
-    if visibility.gpu_temp {
-        if let Some(gpu_temp) = sample.gpu_temp_celsius {
-            lines.push(format!("GPU {:.1} C", gpu_temp));
-        }
-    }
-
-    if lines.len() == 1 {
-        None
-    } else {
-        Some(lines.join("\n"))
-    }
-}
-
-fn show_graph_hover_label(
-    context: &egui::Context,
-    graph_rect: egui::Rect,
-    pointer_pos: egui::Pos2,
-    text: String,
-) {
-    let offset = egui::vec2(12.0, 12.0);
-    let position = egui::pos2(
-        (pointer_pos.x + offset.x).min(graph_rect.right() - 170.0),
-        (pointer_pos.y + offset.y).min(graph_rect.bottom() - 78.0),
-    )
-    .max(graph_rect.left_top() + egui::vec2(8.0, 8.0));
-
-    egui::Area::new(egui::Id::new("temperature_graph_hover_label"))
-        .order(egui::Order::Tooltip)
-        .fixed_pos(position)
-        .interactable(false)
-        .show(context, |ui| {
-            egui::Frame::popup(ui.style())
-                .fill(egui::Color32::from_black_alpha(230))
-                .stroke(egui::Stroke::new(
-                    1.0,
-                    egui::Color32::from_rgb(95, 190, 220),
-                ))
-                .rounding(egui::Rounding::same(6.0))
-                .inner_margin(egui::Margin::symmetric(10.0, 8.0))
-                .show(ui, |ui| {
-                    ui.label(egui::RichText::new(text).color(egui::Color32::WHITE));
-                });
-        });
-}
-
-fn five_minute_x_grid_marks(input: GridInput) -> Vec<GridMark> {
-    let step = GRAPH_TICK_INTERVAL.as_secs_f64();
-    let first = (input.bounds.0 / step).ceil() as i64;
-    let last = (input.bounds.1 / step).floor() as i64;
-
-    (first..=last)
-        .map(|index| GridMark {
-            value: index as f64 * step,
-            step_size: step,
-        })
-        .collect()
-}
-
-fn temperature_y_grid_marks(_input: GridInput) -> Vec<GridMark> {
-    [0.0, 20.0, 40.0, 60.0, 80.0, 100.0]
-        .into_iter()
-        .map(|value| GridMark {
-            value,
-            step_size: 20.0,
-        })
-        .collect()
-}
-
-fn format_time_axis_label(latest_wall_time: SystemTime, x_value: f64) -> String {
-    if x_value < -(GRAPH_LABEL_WINDOW.as_secs_f64()) || x_value > 0.0 {
-        return String::new();
-    }
-
-    let seconds_ago = (-x_value).max(0.0);
-    format_wall_clock_time(latest_wall_time - Duration::from_secs_f64(seconds_ago))
-}
-
-fn format_temperature_axis_label(value: f64) -> String {
-    if value > 100.0 {
-        String::new()
-    } else {
-        format!("{value:.0}")
-    }
-}
-
-fn format_wall_clock_time(time: SystemTime) -> String {
-    #[cfg(unix)]
-    {
-        format_local_wall_clock_time(time)
-    }
-
-    #[cfg(not(unix))]
-    {
-        format_utc_wall_clock_time(time)
-    }
-}
-
-#[cfg(unix)]
-fn format_local_wall_clock_time(time: SystemTime) -> String {
-    use std::mem::MaybeUninit;
-    use std::os::raw::{c_int, c_long};
-
-    #[repr(C)]
-    struct Tm {
-        tm_sec: c_int,
-        tm_min: c_int,
-        tm_hour: c_int,
-        tm_mday: c_int,
-        tm_mon: c_int,
-        tm_year: c_int,
-        tm_wday: c_int,
-        tm_yday: c_int,
-        tm_isdst: c_int,
-        tm_gmtoff: c_long,
-        tm_zone: *const std::os::raw::c_char,
-    }
-
-    extern "C" {
-        fn localtime_r(timep: *const c_long, result: *mut Tm) -> *mut Tm;
-    }
-
-    let Ok(duration) = time.duration_since(UNIX_EPOCH) else {
-        return "--:--".to_owned();
-    };
-
-    let timestamp = duration.as_secs() as c_long;
-    let mut local_time = MaybeUninit::<Tm>::uninit();
-
-    // The graph only needs HH:MM labels; localtime_r keeps that conversion in the OS timezone.
-    let converted = unsafe { localtime_r(&timestamp, local_time.as_mut_ptr()) };
-    if converted.is_null() {
-        return format_utc_wall_clock_time(time);
-    }
-
-    let local_time = unsafe { local_time.assume_init() };
-    format!("{:02}:{:02}", local_time.tm_hour, local_time.tm_min)
-}
-
-fn format_utc_wall_clock_time(time: SystemTime) -> String {
-    let Ok(duration) = time.duration_since(UNIX_EPOCH) else {
-        return "--:--".to_owned();
-    };
-
-    let seconds_since_midnight = duration.as_secs() % (24 * 60 * 60);
-    let hour = seconds_since_midnight / (60 * 60);
-    let minute = (seconds_since_midnight % (60 * 60)) / 60;
-
-    format!("{hour:02}:{minute:02}")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn graph_history_is_capped_to_rolling_window_capacity() {
-        let mut history = GraphHistory {
-            samples: VecDeque::new(),
-            capacity: 2,
-        };
-        let now = Instant::now();
-
-        history.push(now, &sensor_data_with_cpu_temp(60.0));
-        history.push(
-            now + Duration::from_secs(1),
-            &sensor_data_with_cpu_temp(61.0),
-        );
-        history.push(
-            now + Duration::from_secs(2),
-            &sensor_data_with_cpu_temp(62.0),
-        );
-
-        assert_eq!(history.samples.len(), 2);
-        assert_eq!(
-            history.samples.front().unwrap().cpu_temp_celsius,
-            Some(61.0)
-        );
-        assert_eq!(history.samples.back().unwrap().cpu_temp_celsius, Some(62.0));
-    }
-
-    #[test]
-    fn temperature_plot_values_are_clamped_to_fixed_axis() {
-        assert_eq!(clamp_temperature_for_plot(-10.0), 0.0);
-        assert_eq!(clamp_temperature_for_plot(72.5), 72.5);
-        assert_eq!(clamp_temperature_for_plot(108.0), 105.0);
-    }
-
-    #[test]
-    fn hides_temperature_axis_labels_above_one_hundred() {
-        assert_eq!(format_temperature_axis_label(100.0), "100");
-        assert_eq!(format_temperature_axis_label(105.0), "");
-    }
-
-    #[test]
-    fn hides_time_axis_labels_outside_visible_label_window() {
-        let now = UNIX_EPOCH + Duration::from_secs(12 * 60 * 60);
-
-        assert!(!format_time_axis_label(now, -(30.0 * 60.0)).is_empty());
-        assert_eq!(format_time_axis_label(now, -(35.0 * 60.0)), "");
-    }
-
-    #[test]
-    fn hover_text_can_follow_visible_temperature_series() {
-        let mut history = GraphHistory::new();
-        let now = Instant::now();
-        let data = SensorData {
-            cpu_package_temp_celsius: Some(62.0),
-            nvidia_gpu_temp_celsius: Some(72.4),
-            ..SensorData::default()
-        };
-
-        history.push(now, &data);
-
-        let visibility = GraphVisibility {
-            cpu_temp: false,
-            gpu_temp: true,
-        };
-        let label = temperature_hover_text(&history, 0.0, &visibility).unwrap();
-
-        assert!(label.contains("Time "));
-        assert!(!label.contains("CPU "));
-        assert!(label.contains("GPU 72.4 C"));
-    }
-
-    #[test]
-    fn hover_text_is_blank_without_a_nearby_timestamp_sample() {
-        let mut history = GraphHistory::new();
-        let now = Instant::now();
-        let data = SensorData {
-            cpu_package_temp_celsius: Some(62.0),
-            nvidia_gpu_temp_celsius: Some(72.4),
-            ..SensorData::default()
-        };
-
-        history.push(now, &data);
-
-        assert!(temperature_hover_text(&history, -10.0, &GraphVisibility::default()).is_none());
-    }
-
-    fn sensor_data_with_cpu_temp(cpu_temp_celsius: f32) -> SensorData {
-        SensorData {
-            cpu_package_temp_celsius: Some(cpu_temp_celsius),
-            ..SensorData::default()
-        }
-    }
 }

@@ -116,6 +116,11 @@ sudo dnf install gtk3-devel libappindicator-gtk3-devel
 
 More setup details are in [docs/setup.md](docs/setup.md).
 
+## Contributing
+
+Contribution workflow, test expectations, UI constraints, and hardware-safety
+rules are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Hardware Control Notes
 
 Power profile switching writes through:
@@ -172,12 +177,17 @@ touchpoints, so validate setup on your own machine before relying on the app.
 
 ## Project Structure
 
-- `src/app/`: app lifecycle, state, actions, screen rendering, and formatting
+- `src/app/`: app lifecycle, state, actions, formatting, and view modules
+- `src/app/views/`: small egui view modules split by responsibility:
+  chrome/sidebar/toasts, monitoring overview, temperature graph tab, fan-control
+  tab, and power-profile panel
 - `src/ui/`: Nitro-style theme and reusable egui widgets
 - `src/hardware/`: `/sys` sensor discovery, platform profiles, and Acer hwmon fan control
 - `src/services/`: background polling, thermal notifications, and tray integration
 - `src/single_instance.rs`: per-user runtime lock that prevents multiple GUI instances
-- `src/graph.rs`: rolling graph history and rendering
+- `src/graph.rs` and `src/graph/`: rolling graph rendering, history, axis
+  formatting, hover labels, and tests
+- `CONTRIBUTING.md`: contribution workflow, checks, and hardware-safety rules
 - `docs/setup.md`: Fedora setup and install notes
 - `docs/handoff.md`: architecture and continuation notes
 - `docs/official-app-analysis.md`: local official-app extraction guide

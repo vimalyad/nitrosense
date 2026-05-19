@@ -23,6 +23,7 @@ install -Dm644 "packaging/io.github.vimalyad.nitrosense.policy.in" "${STAGE_DIR}
 install -Dm644 "packaging/${APP_NAME}.desktop" "${STAGE_DIR}/share/applications/${APP_NAME}.desktop"
 cp -R "assets/icons/hicolor/." "${STAGE_DIR}/share/icons/hicolor/"
 install -Dm644 "README.md" "${STAGE_DIR}/README.md"
+install -Dm644 "CONTRIBUTING.md" "${STAGE_DIR}/CONTRIBUTING.md"
 install -Dm644 "my_laptop.md" "${STAGE_DIR}/my_laptop.md"
 install -Dm644 "nitrosense_info.md" "${STAGE_DIR}/nitrosense_info.md"
 install -Dm644 "docs/setup.md" "${STAGE_DIR}/docs/setup.md"

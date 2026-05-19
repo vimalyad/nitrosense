@@ -5,8 +5,14 @@
 NitroSense is a native Rust desktop app using `eframe`/`egui`.
 
 - `src/app/mod.rs`: app startup, state, lifecycle, and hardware action handlers.
-- `src/app/views.rs`: fixed-window header, navigation, status, overview, graph,
-  and fan-control screen rendering.
+- `src/app/views.rs`: view module index.
+- `src/app/views/chrome.rs`: fixed-window header, sidebar navigation, active-tab
+  routing, and in-app toast rendering.
+- `src/app/views/overview.rs`: Monitoring tab thermal stats and cooling panels.
+- `src/app/views/graph_tab.rs`: Temperature tab controls and graph embedding.
+- `src/app/views/fan_control.rs`: Fan Control tab status, sliders, Auto action,
+  and fan-control messages.
+- `src/app/views/profile.rs`: platform power profile selection panel.
 - `src/app/formatting.rs`: pure display-formatting helpers and tests.
 - `src/ui/theme.rs`: Nitro-style colors, egui visuals, and reusable panel frame.
 - `src/ui/widgets.rs`: reusable egui widgets such as navigation buttons, metrics, fan panels, and sliders.
@@ -17,8 +23,11 @@ NitroSense is a native Rust desktop app using `eframe`/`egui`.
 - `src/services/notifications.rs`: thermal alert thresholds, cooldowns, and `notify-rust` delivery.
 - `src/services/tray.rs`: feature-gated tray integration with a no-op default backend.
 - `src/single_instance.rs`: per-user file lock that prevents multiple GUI instances while allowing privileged fan-helper invocations.
-- `src/graph.rs`: RAM-only rolling temperature graph history and `egui_plot`
-  rendering with clock-label X-axis and timestamp-aware hover labels.
+- `src/graph.rs`: temperature graph rendering orchestration.
+- `src/graph/history.rs`: RAM-only rolling graph sample history and visibility state.
+- `src/graph/axis.rs`: clock-label X-axis and temperature-axis formatting.
+- `src/graph/hover.rs`: timestamp-aware in-plot hover labels.
+- `src/graph/tests.rs`: graph history, axis, clamp, and hover behavior tests.
 - `docs/setup.md`: Fedora dependencies and local installation/setup commands.
 
 ## Important Build Commands
