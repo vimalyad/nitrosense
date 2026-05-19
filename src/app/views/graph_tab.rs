@@ -8,13 +8,17 @@ impl NitroSenseApp {
     pub(in crate::app::views) fn show_graph_tab(&mut self, ui: &mut egui::Ui) {
         ui.heading("Temperature");
         ui.add_space(8.0);
-        panel_frame().show(ui, |ui| {
-            ui.horizontal_wrapped(|ui| {
-                graph_toggle_chip(ui, "CPU Temp", &mut self.graph_visibility.cpu_temp);
-                graph_toggle_chip(ui, "GPU Temp", &mut self.graph_visibility.gpu_temp);
+        ui.vertical(|ui| {
+            ui.set_width((ui.available_width() - 10.0).max(300.0));
+            panel_frame().show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    graph_toggle_chip(ui, "CPU Temp", &mut self.graph_visibility.cpu_temp);
+                    graph_toggle_chip(ui, "GPU Temp", &mut self.graph_visibility.gpu_temp);
+                });
+                ui.add_space(8.0);
+                show_graph(ui, &self.graph_history, &self.graph_visibility);
             });
-            ui.add_space(8.0);
-            show_graph(ui, &self.graph_history, &self.graph_visibility);
+            ui.add_space(10.0);
         });
     }
 }
