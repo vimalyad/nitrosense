@@ -23,6 +23,31 @@ struct GraphSample {
     gpu_temp_celsius: Option<f32>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TemperatureSeries {
+    Cpu,
+    Gpu,
+}
+
+impl TemperatureSeries {
+    fn id(self) -> egui::Id {
+        match self {
+            Self::Cpu => egui::Id::new("temperature_graph_cpu"),
+            Self::Gpu => egui::Id::new("temperature_graph_gpu"),
+        }
+    }
+
+    fn from_id(id: egui::Id) -> Option<Self> {
+        if id == Self::Cpu.id() {
+            Some(Self::Cpu)
+        } else if id == Self::Gpu.id() {
+            Some(Self::Gpu)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct GraphHistory {
     samples: VecDeque<GraphSample>,
@@ -94,7 +119,11 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
         .unwrap_or_else(SystemTime::now);
 
     let response = Plot::new("temperature_graph")
-        .legend(Legend::default())
+        .legend(
+            Legend::default()
+                .position(Corner::LeftTop)
+                .background_alpha(0.9),
+        )
         .height(360.0)
         .y_axis_label("Celsius")
         .include_x(-(GRAPH_DATA_WINDOW.as_secs_f64()))
@@ -107,9 +136,7 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
             format_time_axis_label(latest_wall_time, mark.value)
         })
         .y_axis_formatter(|mark, _max_chars, _range| format_temperature_axis_label(mark.value))
-        .label_formatter(move |name, point| {
-            format_hover_label(name, latest_wall_time, point.x, point.y)
-        })
+        .label_formatter(|_name, _point| String::new())
         .auto_bounds(egui::Vec2b::new(true, false))
         .allow_drag(egui::Vec2b::new(true, false))
         .allow_scroll(egui::Vec2b::new(true, false))
@@ -134,6 +161,7 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
                 add_line(
                     plot_ui,
                     "CPU",
+                    TemperatureSeries::Cpu.id(),
                     history,
                     egui::Color32::from_rgb(70, 170, 95),
                     |sample| sample.cpu_temp_celsius.map(f64::from),
@@ -144,6 +172,7 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
                 add_line(
                     plot_ui,
                     "GPU",
+                    TemperatureSeries::Gpu.id(),
                     history,
                     egui::Color32::from_rgb(70, 140, 210),
                     |sample| sample.gpu_temp_celsius.map(f64::from),
@@ -155,7 +184,10 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
 
     if let Some(hover_x) = response.inner {
         if response.response.hovered() {
-            if let Some(text) = temperature_hover_text(history, hover_x) {
+            let hovered_series = response
+                .hovered_plot_item
+                .and_then(TemperatureSeries::from_id);
+            if let Some(text) = temperature_hover_text(history, hover_x, hovered_series) {
                 response.response.on_hover_text(text);
             }
         }
@@ -165,6 +197,7 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
 fn add_line(
     plot_ui: &mut egui_plot::PlotUi,
     name: &str,
+    id: egui::Id,
     history: &GraphHistory,
     color: egui::Color32,
     value: impl Fn(&GraphSample) -> Option<f64>,
@@ -194,14 +227,23 @@ fn add_line(
         return;
     }
 
-    plot_ui.line(Line::new(PlotPoints::from(points)).name(name).color(color));
+    plot_ui.line(
+        Line::new(PlotPoints::from(points))
+            .name(name)
+            .id(id)
+            .color(color),
+    );
 }
 
 fn clamp_temperature_for_plot(value: f64) -> f64 {
     value.clamp(TEMPERATURE_MIN_CELSIUS, TEMPERATURE_MAX_CELSIUS)
 }
 
-fn temperature_hover_text(history: &GraphHistory, hover_x: f64) -> Option<String> {
+fn temperature_hover_text(
+    history: &GraphHistory,
+    hover_x: f64,
+    hovered_series: Option<TemperatureSeries>,
+) -> Option<String> {
     let latest_sample = history.samples.back()?;
     let target_seconds_ago = -hover_x;
 
@@ -230,12 +272,16 @@ fn temperature_hover_text(history: &GraphHistory, hover_x: f64) -> Option<String
         format_wall_clock_time(sample.sampled_wall_time)
     ));
 
-    if let Some(cpu_temp) = sample.cpu_temp_celsius {
-        lines.push(format!("CPU {:.1} C", cpu_temp));
+    if hovered_series != Some(TemperatureSeries::Gpu) {
+        if let Some(cpu_temp) = sample.cpu_temp_celsius {
+            lines.push(format!("CPU {:.1} C", cpu_temp));
+        }
     }
 
-    if let Some(gpu_temp) = sample.gpu_temp_celsius {
-        lines.push(format!("GPU {:.1} C", gpu_temp));
+    if hovered_series != Some(TemperatureSeries::Cpu) {
+        if let Some(gpu_temp) = sample.gpu_temp_celsius {
+            lines.push(format!("GPU {:.1} C", gpu_temp));
+        }
     }
 
     if lines.is_empty() {
@@ -282,22 +328,6 @@ fn format_temperature_axis_label(value: f64) -> String {
         String::new()
     } else {
         format!("{value:.0}")
-    }
-}
-
-fn format_hover_label(
-    name: &str,
-    latest_wall_time: SystemTime,
-    x_value: f64,
-    y_value: f64,
-) -> String {
-    let time = format_time_for_x_value(latest_wall_time, x_value);
-    let details = format!("time = {time}\ntemp = {y_value:.1} C");
-
-    if name.is_empty() {
-        details
-    } else {
-        format!("{name}\n{details}")
     }
 }
 
@@ -423,12 +453,22 @@ mod tests {
     }
 
     #[test]
-    fn formats_curve_hover_label_with_named_series_and_units() {
-        let now = UNIX_EPOCH + Duration::from_secs(12 * 60 * 60);
-        let label = format_hover_label("GPU", now, -60.0, 72.4);
+    fn hover_text_can_focus_on_single_temperature_series() {
+        let mut history = GraphHistory::new();
+        let now = Instant::now();
+        let data = SensorData {
+            cpu_package_temp_celsius: Some(62.0),
+            nvidia_gpu_temp_celsius: Some(72.4),
+            ..SensorData::default()
+        };
 
-        assert!(label.starts_with("GPU\ntime = "));
-        assert!(label.ends_with("\ntemp = 72.4 C"));
+        history.push(now, &data);
+
+        let label = temperature_hover_text(&history, 0.0, Some(TemperatureSeries::Gpu)).unwrap();
+
+        assert!(label.contains("Time "));
+        assert!(!label.contains("CPU "));
+        assert!(label.contains("GPU 72.4 C"));
     }
 
     fn sensor_data_with_cpu_temp(cpu_temp_celsius: f32) -> SensorData {
