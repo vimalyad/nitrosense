@@ -4,8 +4,6 @@ use std::path::{Path, PathBuf};
 
 use crate::hardware::profile;
 
-const BATTERY_ROOT: &str = "/sys/class/power_supply/BAT1";
-
 #[derive(Debug, Clone, Default)]
 pub struct SensorData {
     pub cpu_package_temp_celsius: Option<f32>,
@@ -13,7 +11,6 @@ pub struct SensorData {
     pub cpu_fan_rpm: Option<u32>,
     pub gpu_fan_rpm: Option<u32>,
     pub nvme_temp_celsius: Option<f32>,
-    pub battery_voltage: Option<f32>,
     pub active_power_profile: Option<String>,
 }
 
@@ -51,7 +48,6 @@ impl HwmonDevices {
                 .nvme
                 .as_deref()
                 .and_then(|path| read_temp_celsius(path, 1)),
-            battery_voltage: read_battery_voltage(),
             active_power_profile: profile::read_active_profile()
                 .ok()
                 .flatten()
@@ -150,21 +146,6 @@ fn read_temp_celsius(hwmon_path: &Path, index: u8) -> Option<f32> {
 fn read_fan_rpm(hwmon_path: &Path, index: u8) -> Option<u32> {
     let path = hwmon_path.join(format!("fan{index}_input"));
     read_u32_file(path)
-}
-
-fn read_battery_voltage() -> Option<f32> {
-    read_battery_voltage_from(BATTERY_ROOT)
-}
-
-fn read_battery_voltage_from(root: impl AsRef<Path>) -> Option<f32> {
-    let root = root.as_ref();
-
-    read_i64_file(root.join("voltage_now"))
-        .map(|microvolts| microvolts as f32 / 1_000_000.0)
-        .or_else(|| {
-            read_i64_file(root.join("voltage_avg"))
-                .map(|microvolts| microvolts as f32 / 1_000_000.0)
-        })
 }
 
 fn read_i64_file(path: impl AsRef<Path>) -> Option<i64> {
@@ -269,17 +250,6 @@ mod tests {
             devices.read_sensor_data().nvidia_gpu_temp_celsius,
             Some(48.0)
         );
-
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn converts_microvolt_battery_voltage_to_volts() {
-        let root = unique_test_dir("battery-voltage");
-        fs::create_dir_all(&root).unwrap();
-        fs::write(root.join("voltage_now"), "16440000\n").unwrap();
-
-        assert_eq!(read_battery_voltage_from(&root), Some(16.44));
 
         fs::remove_dir_all(root).unwrap();
     }
