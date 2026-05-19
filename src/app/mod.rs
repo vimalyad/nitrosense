@@ -18,7 +18,7 @@ use crate::services::polling::{spawn_sensor_polling, SensorSnapshot};
 use crate::services::tray::{state_for_cpu_temp, TrayAction, TrayController};
 use crate::ui::theme::{app_background_color, apply_nitro_style, sidebar_color};
 
-const NOTIFICATION_STATUS_TTL: Duration = Duration::from_secs(30);
+const NOTIFICATION_STATUS_TTL: Duration = Duration::from_secs(2);
 
 pub fn run() -> Result<()> {
     let runtime = Runtime::new()?;
@@ -178,6 +178,7 @@ impl eframe::App for NitroSenseApp {
                         });
                     });
             });
+        self.show_app_toast(context);
     }
 }
 
