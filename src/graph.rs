@@ -2,9 +2,7 @@ use std::collections::VecDeque;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use eframe::egui;
-use egui_plot::{
-    CoordinatesFormatter, Corner, GridInput, GridMark, Legend, Line, Plot, PlotBounds, PlotPoints,
-};
+use egui_plot::{Corner, GridInput, GridMark, Legend, Line, Plot, PlotBounds, PlotPoints};
 
 use crate::hardware::sensors::SensorData;
 
@@ -12,6 +10,7 @@ const GRAPH_DATA_WINDOW: Duration = Duration::from_secs(35 * 60);
 const GRAPH_LABEL_WINDOW: Duration = Duration::from_secs(30 * 60);
 const GRAPH_TICK_INTERVAL: Duration = Duration::from_secs(5 * 60);
 const GRAPH_CAPACITY: usize = 35 * 60;
+const HOVER_SAMPLE_TOLERANCE: Duration = Duration::from_secs(2);
 const TEMPERATURE_MIN_CELSIUS: f64 = 0.0;
 const TEMPERATURE_MAX_CELSIUS: f64 = 105.0;
 
@@ -23,7 +22,7 @@ struct GraphSample {
     gpu_temp_celsius: Option<f32>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 enum TemperatureSeries {
     Cpu,
     Gpu,
@@ -34,16 +33,6 @@ impl TemperatureSeries {
         match self {
             Self::Cpu => egui::Id::new("temperature_graph_cpu"),
             Self::Gpu => egui::Id::new("temperature_graph_gpu"),
-        }
-    }
-
-    fn from_id(id: egui::Id) -> Option<Self> {
-        if id == Self::Cpu.id() {
-            Some(Self::Cpu)
-        } else if id == Self::Gpu.id() {
-            Some(Self::Gpu)
-        } else {
-            None
         }
     }
 }
@@ -118,7 +107,7 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
         .map(|sample| sample.sampled_wall_time)
         .unwrap_or_else(SystemTime::now);
 
-    let response = Plot::new("temperature_graph")
+    Plot::new("temperature_graph")
         .legend(
             Legend::default()
                 .position(Corner::LeftTop)
@@ -141,16 +130,6 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
         .allow_drag(egui::Vec2b::new(true, false))
         .allow_scroll(egui::Vec2b::new(true, false))
         .allow_zoom(egui::Vec2b::new(true, false))
-        .coordinates_formatter(
-            Corner::LeftBottom,
-            CoordinatesFormatter::new(move |point, _bounds| {
-                format!(
-                    "time = {}\ntemp = {:.1} C",
-                    format_time_for_x_value(latest_wall_time, point.x),
-                    point.y
-                )
-            }),
-        )
         .show(ui, |plot_ui| {
             plot_ui.set_plot_bounds(PlotBounds::from_min_max(
                 [-(GRAPH_DATA_WINDOW.as_secs_f64()), TEMPERATURE_MIN_CELSIUS],
@@ -179,19 +158,22 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
                 );
             }
 
-            plot_ui.pointer_coordinate().map(|point| point.x)
-        });
-
-    if let Some(hover_x) = response.inner {
-        if response.response.hovered() {
-            let hovered_series = response
-                .hovered_plot_item
-                .and_then(TemperatureSeries::from_id);
-            if let Some(text) = temperature_hover_text(history, hover_x, hovered_series) {
-                response.response.on_hover_text(text);
+            if plot_ui.response().hovered() {
+                if let (Some(point), Some(pointer_pos)) = (
+                    plot_ui.pointer_coordinate(),
+                    plot_ui.ctx().input(|input| input.pointer.latest_pos()),
+                ) {
+                    if let Some(text) = temperature_hover_text(history, point.x, visibility) {
+                        show_graph_hover_label(
+                            plot_ui.ctx(),
+                            plot_ui.response().rect,
+                            pointer_pos,
+                            text,
+                        );
+                    }
+                }
             }
-        }
-    }
+        });
 }
 
 fn add_line(
@@ -242,7 +224,7 @@ fn clamp_temperature_for_plot(value: f64) -> f64 {
 fn temperature_hover_text(
     history: &GraphHistory,
     hover_x: f64,
-    hovered_series: Option<TemperatureSeries>,
+    visibility: &GraphVisibility,
 ) -> Option<String> {
     let latest_sample = history.samples.back()?;
     let target_seconds_ago = -hover_x;
@@ -256,8 +238,11 @@ fn temperature_hover_text(
                 .duration_since(sample.sampled_at)
                 .as_secs_f64();
 
-            if seconds_ago <= GRAPH_DATA_WINDOW.as_secs_f64() {
-                Some((sample, (seconds_ago - target_seconds_ago).abs()))
+            let distance_seconds = (seconds_ago - target_seconds_ago).abs();
+            if seconds_ago <= GRAPH_DATA_WINDOW.as_secs_f64()
+                && distance_seconds <= HOVER_SAMPLE_TOLERANCE.as_secs_f64()
+            {
+                Some((sample, distance_seconds))
             } else {
                 None
             }
@@ -272,23 +257,55 @@ fn temperature_hover_text(
         format_wall_clock_time(sample.sampled_wall_time)
     ));
 
-    if hovered_series != Some(TemperatureSeries::Gpu) {
+    if visibility.cpu_temp {
         if let Some(cpu_temp) = sample.cpu_temp_celsius {
             lines.push(format!("CPU {:.1} C", cpu_temp));
         }
     }
 
-    if hovered_series != Some(TemperatureSeries::Cpu) {
+    if visibility.gpu_temp {
         if let Some(gpu_temp) = sample.gpu_temp_celsius {
             lines.push(format!("GPU {:.1} C", gpu_temp));
         }
     }
 
-    if lines.is_empty() {
+    if lines.len() == 1 {
         None
     } else {
         Some(lines.join("\n"))
     }
+}
+
+fn show_graph_hover_label(
+    context: &egui::Context,
+    graph_rect: egui::Rect,
+    pointer_pos: egui::Pos2,
+    text: String,
+) {
+    let offset = egui::vec2(12.0, 12.0);
+    let position = egui::pos2(
+        (pointer_pos.x + offset.x).min(graph_rect.right() - 170.0),
+        (pointer_pos.y + offset.y).min(graph_rect.bottom() - 78.0),
+    )
+    .max(graph_rect.left_top() + egui::vec2(8.0, 8.0));
+
+    egui::Area::new(egui::Id::new("temperature_graph_hover_label"))
+        .order(egui::Order::Tooltip)
+        .fixed_pos(position)
+        .interactable(false)
+        .show(context, |ui| {
+            egui::Frame::popup(ui.style())
+                .fill(egui::Color32::from_black_alpha(230))
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    egui::Color32::from_rgb(95, 190, 220),
+                ))
+                .rounding(egui::Rounding::same(6.0))
+                .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+                .show(ui, |ui| {
+                    ui.label(egui::RichText::new(text).color(egui::Color32::WHITE));
+                });
+        });
 }
 
 fn five_minute_x_grid_marks(input: GridInput) -> Vec<GridMark> {
@@ -329,11 +346,6 @@ fn format_temperature_axis_label(value: f64) -> String {
     } else {
         format!("{value:.0}")
     }
-}
-
-fn format_time_for_x_value(latest_wall_time: SystemTime, x_value: f64) -> String {
-    let seconds_ago = (-x_value).max(0.0);
-    format_wall_clock_time(latest_wall_time - Duration::from_secs_f64(seconds_ago))
 }
 
 fn format_wall_clock_time(time: SystemTime) -> String {
@@ -453,7 +465,7 @@ mod tests {
     }
 
     #[test]
-    fn hover_text_can_focus_on_single_temperature_series() {
+    fn hover_text_can_follow_visible_temperature_series() {
         let mut history = GraphHistory::new();
         let now = Instant::now();
         let data = SensorData {
@@ -464,11 +476,30 @@ mod tests {
 
         history.push(now, &data);
 
-        let label = temperature_hover_text(&history, 0.0, Some(TemperatureSeries::Gpu)).unwrap();
+        let visibility = GraphVisibility {
+            cpu_temp: false,
+            gpu_temp: true,
+        };
+        let label = temperature_hover_text(&history, 0.0, &visibility).unwrap();
 
         assert!(label.contains("Time "));
         assert!(!label.contains("CPU "));
         assert!(label.contains("GPU 72.4 C"));
+    }
+
+    #[test]
+    fn hover_text_is_blank_without_a_nearby_timestamp_sample() {
+        let mut history = GraphHistory::new();
+        let now = Instant::now();
+        let data = SensorData {
+            cpu_package_temp_celsius: Some(62.0),
+            nvidia_gpu_temp_celsius: Some(72.4),
+            ..SensorData::default()
+        };
+
+        history.push(now, &data);
+
+        assert!(temperature_hover_text(&history, -10.0, &GraphVisibility::default()).is_none());
     }
 
     fn sensor_data_with_cpu_temp(cpu_temp_celsius: f32) -> SensorData {
