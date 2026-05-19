@@ -84,7 +84,7 @@ impl NitroSenseApp {
             );
             ui.add_space(16.0);
             ui.label(
-                egui::RichText::new("❤️ created by")
+                egui::RichText::new("created by")
                     .size(10.5)
                     .color(dim_text_color()),
             );
@@ -98,46 +98,61 @@ impl NitroSenseApp {
     }
 
     pub(super) fn show_status_strip(&mut self, ui: &mut egui::Ui) {
-        panel_frame().show(ui, |ui| {
-            ui.set_min_height(52.0);
-            ui.horizontal_wrapped(|ui| {
-                ui.allocate_ui_with_layout(
-                    egui::vec2(124.0, 40.0),
-                    egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                    |ui| {
-                        compact_metric(
-                            ui,
-                            "CPU",
-                            format_temperature(self.sensor_data().cpu_package_temp_celsius),
-                        );
-                    },
-                );
-                ui.allocate_ui_with_layout(
-                    egui::vec2(124.0, 40.0),
-                    egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                    |ui| {
-                        compact_metric(
-                            ui,
-                            "GPU",
-                            format_temperature(self.sensor_data().nvidia_gpu_temp_celsius),
-                        );
-                    },
-                );
-                ui.allocate_ui_with_layout(
-                    egui::vec2(124.0, 40.0),
-                    egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                    |ui| {
-                        compact_metric(
-                            ui,
-                            "Profile",
-                            self.sensor_data()
-                                .active_power_profile
-                                .clone()
-                                .unwrap_or_else(|| "Unavailable".to_owned()),
-                        );
-                    },
-                );
-            });
+        ui.horizontal(|ui| {
+            ui.add_space(40.0);
+            let strip_width = (ui.available_width() * 0.70).max(360.0);
+            ui.allocate_ui_with_layout(
+                egui::vec2(strip_width, 80.0),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| {
+                    panel_frame().show(ui, |ui| {
+                        ui.set_width(strip_width);
+                        ui.set_min_height(52.0);
+                        ui.horizontal_wrapped(|ui| {
+                            ui.allocate_ui_with_layout(
+                                egui::vec2(124.0, 40.0),
+                                egui::Layout::centered_and_justified(egui::Direction::TopDown),
+                                |ui| {
+                                    compact_metric(
+                                        ui,
+                                        "CPU",
+                                        format_temperature(
+                                            self.sensor_data().cpu_package_temp_celsius,
+                                        ),
+                                    );
+                                },
+                            );
+                            ui.allocate_ui_with_layout(
+                                egui::vec2(124.0, 40.0),
+                                egui::Layout::centered_and_justified(egui::Direction::TopDown),
+                                |ui| {
+                                    compact_metric(
+                                        ui,
+                                        "GPU",
+                                        format_temperature(
+                                            self.sensor_data().nvidia_gpu_temp_celsius,
+                                        ),
+                                    );
+                                },
+                            );
+                            ui.allocate_ui_with_layout(
+                                egui::vec2(124.0, 40.0),
+                                egui::Layout::centered_and_justified(egui::Direction::TopDown),
+                                |ui| {
+                                    compact_metric(
+                                        ui,
+                                        "Profile",
+                                        self.sensor_data()
+                                            .active_power_profile
+                                            .clone()
+                                            .unwrap_or_else(|| "Unavailable".to_owned()),
+                                    );
+                                },
+                            );
+                        });
+                    });
+                },
+            );
         });
     }
 
@@ -278,45 +293,39 @@ impl NitroSenseApp {
     }
 
     fn show_overview_tab(&self, ui: &mut egui::Ui) {
-        egui::ScrollArea::vertical()
-            .id_source("overview_scroll")
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                ui.vertical(|ui| {
-                    ui.set_width(ui.available_width());
-                    ui.heading("Thermals");
-                    ui.add_space(8.0);
-                    self.show_stats(ui);
-                });
+        ui.vertical(|ui| {
+            ui.set_width(ui.available_width());
+            ui.heading("Thermals");
+            ui.add_space(8.0);
+            self.show_stats(ui);
+        });
 
-                ui.add_space(18.0);
+        ui.add_space(18.0);
 
-                ui.vertical(|ui| {
-                    ui.set_width(ui.available_width());
-                    ui.heading("Cooling");
-                    ui.add_space(8.0);
-                    fan_dashboard_panel(ui, "CPU Fan", self.sensor_data().cpu_fan_rpm);
-                    ui.add_space(8.0);
-                    let (rect, _) =
-                        ui.allocate_exact_size(egui::vec2(310.0, 1.0), egui::Sense::hover());
-                    ui.painter().line_segment(
-                        [rect.left_center(), rect.right_center()],
-                        egui::Stroke::new(1.0, inner_separator_color()),
-                    );
-                    ui.add_space(8.0);
-                    fan_dashboard_panel(ui, "GPU Fan", self.sensor_data().gpu_fan_rpm);
-                    ui.add_space(8.0);
-                });
+        ui.vertical(|ui| {
+            ui.set_width(ui.available_width());
+            ui.heading("Cooling");
+            ui.add_space(8.0);
+            fan_dashboard_panel(ui, "CPU Fan", self.sensor_data().cpu_fan_rpm);
+            ui.add_space(8.0);
+            let (rect, _) = ui.allocate_exact_size(egui::vec2(310.0, 1.0), egui::Sense::hover());
+            ui.painter().line_segment(
+                [rect.left_center(), rect.right_center()],
+                egui::Stroke::new(1.0, inner_separator_color()),
+            );
+            ui.add_space(8.0);
+            fan_dashboard_panel(ui, "GPU Fan", self.sensor_data().gpu_fan_rpm);
+            ui.add_space(8.0);
+        });
 
-                ui.add_space(18.0);
+        ui.add_space(18.0);
 
-                ui.vertical(|ui| {
-                    ui.set_width(ui.available_width());
-                    ui.heading("Battery");
-                    ui.add_space(8.0);
-                    self.battery_panel(ui);
-                });
-            });
+        ui.vertical(|ui| {
+            ui.set_width(ui.available_width());
+            ui.heading("Battery");
+            ui.add_space(8.0);
+            self.battery_panel(ui);
+        });
     }
 
     fn battery_panel(&self, ui: &mut egui::Ui) {
