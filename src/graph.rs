@@ -96,6 +96,7 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
     let response = Plot::new("temperature_graph")
         .legend(Legend::default())
         .height(360.0)
+        .y_axis_label("Celsius")
         .include_x(-(GRAPH_DATA_WINDOW.as_secs_f64()))
         .include_x(0.0)
         .include_y(TEMPERATURE_MIN_CELSIUS)
@@ -106,14 +107,21 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
             format_time_axis_label(latest_wall_time, mark.value)
         })
         .y_axis_formatter(|mark, _max_chars, _range| format_temperature_axis_label(mark.value))
+        .label_formatter(move |name, point| {
+            format_hover_label(name, latest_wall_time, point.x, point.y)
+        })
         .auto_bounds(egui::Vec2b::new(true, false))
         .allow_drag(egui::Vec2b::new(true, false))
         .allow_scroll(egui::Vec2b::new(true, false))
         .allow_zoom(egui::Vec2b::new(true, false))
         .coordinates_formatter(
             Corner::LeftBottom,
-            CoordinatesFormatter::new(|point, _bounds| {
-                format!("{}\n{:.0} C", format_duration_ago(-point.x), point.y)
+            CoordinatesFormatter::new(move |point, _bounds| {
+                format!(
+                    "time = {}\ntemp = {:.1} C",
+                    format_time_for_x_value(latest_wall_time, point.x),
+                    point.y
+                )
             }),
         )
         .show(ui, |plot_ui| {
@@ -125,7 +133,7 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
             if visibility.cpu_temp {
                 add_line(
                     plot_ui,
-                    "CPU Temp C",
+                    "CPU",
                     history,
                     egui::Color32::from_rgb(70, 170, 95),
                     |sample| sample.cpu_temp_celsius.map(f64::from),
@@ -135,7 +143,7 @@ pub fn show_graph(ui: &mut egui::Ui, history: &GraphHistory, visibility: &GraphV
             if visibility.gpu_temp {
                 add_line(
                     plot_ui,
-                    "GPU Temp C",
+                    "GPU",
                     history,
                     egui::Color32::from_rgb(70, 140, 210),
                     |sample| sample.gpu_temp_celsius.map(f64::from),
@@ -277,16 +285,25 @@ fn format_temperature_axis_label(value: f64) -> String {
     }
 }
 
-fn format_duration_ago(seconds_ago: f64) -> String {
-    let total_seconds = seconds_ago.max(0.0).round() as u64;
-    let minutes = total_seconds / 60;
-    let seconds = total_seconds % 60;
+fn format_hover_label(
+    name: &str,
+    latest_wall_time: SystemTime,
+    x_value: f64,
+    y_value: f64,
+) -> String {
+    let time = format_time_for_x_value(latest_wall_time, x_value);
+    let details = format!("time = {time}\ntemp = {y_value:.1} C");
 
-    if minutes == 0 {
-        format!("{seconds}s ago")
+    if name.is_empty() {
+        details
     } else {
-        format!("{minutes}m {seconds:02}s ago")
+        format!("{name}\n{details}")
     }
+}
+
+fn format_time_for_x_value(latest_wall_time: SystemTime, x_value: f64) -> String {
+    let seconds_ago = (-x_value).max(0.0);
+    format_wall_clock_time(latest_wall_time - Duration::from_secs_f64(seconds_ago))
 }
 
 fn format_wall_clock_time(time: SystemTime) -> String {
@@ -403,6 +420,15 @@ mod tests {
 
         assert!(!format_time_axis_label(now, -(30.0 * 60.0)).is_empty());
         assert_eq!(format_time_axis_label(now, -(35.0 * 60.0)), "");
+    }
+
+    #[test]
+    fn formats_curve_hover_label_with_named_series_and_units() {
+        let now = UNIX_EPOCH + Duration::from_secs(12 * 60 * 60);
+        let label = format_hover_label("GPU", now, -60.0, 72.4);
+
+        assert!(label.starts_with("GPU\ntime = "));
+        assert!(label.ends_with("\ntemp = 72.4 C"));
     }
 
     fn sensor_data_with_cpu_temp(cpu_temp_celsius: f32) -> SensorData {
