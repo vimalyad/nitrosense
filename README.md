@@ -21,7 +21,9 @@ not tracked.
 - Dynamic hwmon discovery for changing `/sys/class/hwmon/hwmon*` indexes
 - CPU, GPU, NVMe, fan RPM, battery voltage, and power profile display
 - One-second background polling with Tokio
-- Rolling in-memory graph using `egui_plot`
+- Rolling 35-minute in-memory temperature graph using `egui_plot`, with
+  five-minute clock labels, a `0..105 C` plot range, and labels shown only up to
+  `100 C`
 - Platform power profile switching
 - Acer `acer-wmi` hwmon PWM fan control for the AN515-58
 - Thermal desktop notifications
@@ -29,6 +31,8 @@ not tracked.
 - Feature-gated system tray support
 - Desktop entry and setup documentation
 - Correctly sized hicolor application icons for desktop launchers
+- Fixed `920x600` non-resizable window layout tuned for a `176px` sidebar and
+  the AN515-58 dashboard screens
 
 ## Reverse Engineering Notes
 
@@ -73,6 +77,13 @@ Run:
 
 ```bash
 ./target/release/nitrosense
+```
+
+For normal fan-control testing, prefer the installed launcher path because the
+Polkit action is generated for `~/.local/bin/nitrosense`:
+
+```bash
+~/.local/bin/nitrosense
 ```
 
 Install for the current user:
@@ -126,10 +137,27 @@ pkexec nitrosense --fan-helper set-auto
 The local installer also installs a NitroSense Polkit action for the installed
 binary path with `auth_admin_keep`. The GUI never reads or stores your password;
 Polkit shows the system authentication prompt, keeps the authorization briefly,
-and the helper only accepts validated fan-control commands. If you run the app
-directly from `target/release/nitrosense`, that installed policy path will not
-match, so use the application launcher or `~/.local/bin/nitrosense` for normal
-fan control testing.
+and the helper only accepts validated fan-control commands. Slider changes are
+debounced and applied through the batched `set-manual-both` helper command. If
+you run the app directly from `target/release/nitrosense`, that installed policy
+path will not match, so use the application launcher or `~/.local/bin/nitrosense`
+for normal fan control testing.
+
+The GUI is single-instance guarded. A second normal launch exits early instead
+of creating another polling/fan-control window. Privileged `--fan-helper`
+processes are exempt from that GUI lock.
+
+## UI Behavior
+
+- The main window is fixed at `920x600`, non-resizable, with the maximize button
+  disabled.
+- The left sidebar is fixed at `176px`.
+- Monitoring, temperature graph, and fan-control panels are sized for the
+  remaining fixed content area.
+- Temperature graph hover labels appear inside the graph only when a real nearby
+  sample timestamp exists. If both CPU and GPU graph series are visible, both
+  readings are shown; if one series is hidden, only the visible series is shown.
+- Notification status text is subtle and expires after 30 seconds.
 
 Launcher icons are installed from `assets/icons/hicolor/`, which contains the
 fixed app sizes declared by Fedora's hicolor theme, including `22x22`, `36x36`,

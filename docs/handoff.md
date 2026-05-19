@@ -5,7 +5,8 @@
 NitroSense is a native Rust desktop app using `eframe`/`egui`.
 
 - `src/app/mod.rs`: app startup, state, lifecycle, and hardware action handlers.
-- `src/app/views.rs`: header, navigation, status, overview, graph, and fan-control screen rendering.
+- `src/app/views.rs`: fixed-window header, navigation, status, overview, graph,
+  and fan-control screen rendering.
 - `src/app/formatting.rs`: pure display-formatting helpers and tests.
 - `src/ui/theme.rs`: Nitro-style colors, egui visuals, and reusable panel frame.
 - `src/ui/widgets.rs`: reusable egui widgets such as navigation buttons, metrics, fan panels, and sliders.
@@ -16,7 +17,8 @@ NitroSense is a native Rust desktop app using `eframe`/`egui`.
 - `src/services/notifications.rs`: thermal alert thresholds, cooldowns, and `notify-rust` delivery.
 - `src/services/tray.rs`: feature-gated tray integration with a no-op default backend.
 - `src/single_instance.rs`: per-user file lock that prevents multiple GUI instances while allowing privileged fan-helper invocations.
-- `src/graph.rs`: RAM-only rolling graph history and `egui_plot` rendering.
+- `src/graph.rs`: RAM-only rolling temperature graph history and `egui_plot`
+  rendering with clock-label X-axis and timestamp-aware hover labels.
 - `docs/setup.md`: Fedora dependencies and local installation/setup commands.
 
 ## Important Build Commands
@@ -58,10 +60,17 @@ sudo dnf install gtk3-devel libappindicator-gtk3-devel
   performs validated writes. `scripts/install-local.sh` installs a dedicated
   Polkit policy for `~/.local/bin/nitrosense --fan-helper` with
   `auth_admin_keep`; running a different binary path will not match that policy.
+  Manual CPU/GPU slider updates are debounced and batched through the
+  `set-manual-both` helper path.
 - The GUI process is single-instance guarded with an exclusive per-user lock
   under `$XDG_RUNTIME_DIR/nitrosense.lock`, falling back to `/tmp` when needed.
   The lock is acquired after `--fan-helper` handling so Polkit helper processes
   can still run while the GUI is open.
+- The main window is intentionally fixed at `920x600`, non-resizable, and has no
+  maximize button. Layout code assumes the `176px` sidebar and roughly `744px`
+  remaining window width.
+- Notification status text is intentionally subtle and expires after 30 seconds
+  so old thermal alerts do not stay prominent in the UI.
 
 ## Branch Flow
 

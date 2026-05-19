@@ -74,7 +74,9 @@ nitrosense
 Fan writes use Polkit through `pkexec nitrosense --fan-helper ...`. The policy
 installed above uses `auth_admin_keep`, so one successful fan-control
 authentication should be retained briefly by Polkit for later slider updates.
-Profile writes still use sudo. See `docs/setup.md`.
+The GUI is single-instance guarded, opens as a fixed `920x600` window, and is
+custom-targeted at the Acer Nitro AN515-58. Profile writes still use sudo. See
+`docs/setup.md`.
 
 This is alpha hardware-control software. Use only if your laptop exposes the
 expected Acer hwmon PWM controls.

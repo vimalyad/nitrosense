@@ -189,5 +189,10 @@ Implementation decision:
 - Read NVMe temperature and battery voltage.
 - Switch Linux platform profiles.
 - Control CPU/GPU fan PWM through Acer hwmon.
-- Keep temperature graphs fixed to `0..100 C`; out-of-range values should still
-  be visible in hover readouts without expanding the graph range.
+- Keep temperature graphs plotted in a fixed `0..105 C` range while only labeling
+  the Y-axis up to `100 C`; values above `100 C` should remain visible without
+  expanding the graph range.
+- Keep the GUI fixed at `920x600` with a `176px` sidebar, matching the custom
+  AN515-58 dashboard layout.
+- Keep the GUI single-instance guarded so two hardware-control windows do not
+  run at the same time.

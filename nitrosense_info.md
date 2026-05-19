@@ -470,9 +470,30 @@ Practical implementation decision:
   backend for this custom AN515-58 app.
 - Map UI percentage `0..100` to Linux PWM `0..255`.
 - Set manual mode by writing `pwmN_enable=1`, then writing `pwmN`.
+- Batch GUI manual CPU/GPU slider updates through one Polkit helper operation
+  where possible, so one debounced UI change does not create separate CPU and GPU
+  authorization prompts.
 - Try restoring automatic mode through the standard hwmon convention
   `pwmN_enable=2`; if the driver rejects it, the app should report that error
   and the user can use platform profiles while we investigate the Acer WMI method
   bridge further.
 - Avoid raw EC writes for now because the official Windows app also uses a
   higher-level Acer WMI/driver interface rather than direct UI-side EC access.
+
+## Current App Behavior Summary
+
+- Target window: fixed `920x600`, non-resizable, no maximize button.
+- Sidebar: fixed `176px`; the remaining content area is laid out for the custom
+  AN515-58 dashboard rather than arbitrary widescreen scaling.
+- Monitoring view: fixed-width stats grid plus a capped cooling column.
+- Temperature view: CPU/GPU temperature graph with a 35-minute retained data
+  window, five-minute time labels for the latest 30 minutes, and a plotted
+  `0..105 C` range with labels only through `100 C`.
+- Graph hover: shows a high-contrast in-plot label only when the pointer is near
+  a real sample timestamp; visible CPU/GPU series determine which readings are
+  displayed.
+- Fan control view: CPU/GPU sliders auto-apply after the debounce period through
+  the restricted Polkit helper; failures trigger an attempt to restore automatic
+  fan control.
+- Process model: normal GUI launches are single-instance guarded, while
+  `--fan-helper` invocations remain allowed during a running GUI session.
