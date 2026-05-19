@@ -21,12 +21,6 @@ pub(crate) fn format_rpm(value: Option<u32>) -> String {
         .unwrap_or_else(|| "Unavailable".to_owned())
 }
 
-pub(crate) fn format_voltage(value: Option<f32>) -> String {
-    value
-        .map(|voltage| format!("{voltage:.2} V"))
-        .unwrap_or_else(|| "Unavailable".to_owned())
-}
-
 pub(crate) fn fallback_profile_names() -> Vec<String> {
     [
         "low-power",

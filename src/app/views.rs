@@ -3,7 +3,6 @@ use eframe::egui;
 use super::{AppTab, NitroSenseApp};
 use crate::app::formatting::{
     display_profile_name, fallback_profile_names, format_pwm_state, format_temperature,
-    format_voltage,
 };
 use crate::graph::show_graph;
 use crate::ui::theme::{
@@ -251,38 +250,6 @@ impl NitroSenseApp {
             ui.add_space(8.0);
             fan_dashboard_panel(ui, "GPU Fan", self.sensor_data().gpu_fan_rpm);
             ui.add_space(8.0);
-        });
-
-        ui.add_space(18.0);
-
-        ui.vertical(|ui| {
-            ui.set_width(ui.available_width());
-            ui.heading("Battery");
-            ui.add_space(8.0);
-            self.battery_panel(ui);
-        });
-    }
-
-    fn battery_panel(&self, ui: &mut egui::Ui) {
-        stat_card_frame().show(ui, |ui| {
-            ui.label(
-                egui::RichText::new("Battery")
-                    .size(11.0)
-                    .strong()
-                    .color(accent_color()),
-            );
-            ui.add_space(2.0);
-            ui.label(
-                egui::RichText::new(format_voltage(self.sensor_data().battery_voltage))
-                    .size(20.0)
-                    .color(readout_color()),
-            );
-            ui.add_space(2.0);
-            ui.label(
-                egui::RichText::new("BAT1")
-                    .size(10.5)
-                    .color(dim_text_color()),
-            );
         });
     }
 
@@ -541,8 +508,8 @@ fn graph_toggle_chip(ui: &mut egui::Ui, label: &str, enabled: &mut bool) {
 
 fn constrained_fan_control_panel(ui: &mut egui::Ui, content: impl FnOnce(&mut egui::Ui)) {
     ui.horizontal(|ui| {
-        ui.add_space(30.0);
-        let panel_width = ((ui.available_width() - 30.0).max(320.0) * 0.80).max(360.0);
+        ui.add_space(10.0);
+        let panel_width = ui.available_width().max(360.0);
         ui.allocate_ui_with_layout(
             egui::vec2(panel_width, 0.0),
             egui::Layout::top_down(egui::Align::Min),
