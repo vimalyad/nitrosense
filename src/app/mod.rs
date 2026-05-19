@@ -172,8 +172,6 @@ impl eframe::App for NitroSenseApp {
                             ui.add_space(14.0);
                             self.show_header(ui);
                             ui.add_space(14.0);
-                            self.show_status_strip(ui);
-                            ui.add_space(14.0);
                             self.show_active_tab(ui);
                         });
                     });

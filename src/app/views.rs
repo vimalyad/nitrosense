@@ -10,7 +10,7 @@ use crate::ui::theme::{
     accent_color, card_surface_color, critical_color, dim_text_color, inner_separator_color,
     panel_frame, readout_color, stat_card_frame, warm_color, warning_color,
 };
-use crate::ui::widgets::{compact_metric, fan_dashboard_panel, fan_slider_row, nav_button};
+use crate::ui::widgets::{fan_dashboard_panel, fan_slider_row, nav_button};
 
 impl NitroSenseApp {
     pub(super) fn show_header(&self, ui: &mut egui::Ui) {
@@ -95,65 +95,6 @@ impl NitroSenseApp {
             );
         });
         ui.add_space(12.0);
-    }
-
-    pub(super) fn show_status_strip(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.add_space(40.0);
-            let strip_width = (ui.available_width() * 0.70).max(360.0);
-            ui.allocate_ui_with_layout(
-                egui::vec2(strip_width, 80.0),
-                egui::Layout::top_down(egui::Align::Min),
-                |ui| {
-                    panel_frame().show(ui, |ui| {
-                        ui.set_width(strip_width);
-                        ui.set_min_height(52.0);
-                        ui.horizontal_wrapped(|ui| {
-                            ui.allocate_ui_with_layout(
-                                egui::vec2(124.0, 40.0),
-                                egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                                |ui| {
-                                    compact_metric(
-                                        ui,
-                                        "CPU",
-                                        format_temperature(
-                                            self.sensor_data().cpu_package_temp_celsius,
-                                        ),
-                                    );
-                                },
-                            );
-                            ui.allocate_ui_with_layout(
-                                egui::vec2(124.0, 40.0),
-                                egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                                |ui| {
-                                    compact_metric(
-                                        ui,
-                                        "GPU",
-                                        format_temperature(
-                                            self.sensor_data().nvidia_gpu_temp_celsius,
-                                        ),
-                                    );
-                                },
-                            );
-                            ui.allocate_ui_with_layout(
-                                egui::vec2(124.0, 40.0),
-                                egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                                |ui| {
-                                    compact_metric(
-                                        ui,
-                                        "Profile",
-                                        self.sensor_data()
-                                            .active_power_profile
-                                            .clone()
-                                            .unwrap_or_else(|| "Unavailable".to_owned()),
-                                    );
-                                },
-                            );
-                        });
-                    });
-                },
-            );
-        });
     }
 
     pub(super) fn show_power_profile(&mut self, ui: &mut egui::Ui) {
@@ -425,70 +366,72 @@ impl NitroSenseApp {
         ui.heading("Fan Control");
         ui.add_space(8.0);
 
-        panel_frame().show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            if let Some(path) = &self.fan_control_status.acer_hwmon_path {
-                ui.label(
-                    egui::RichText::new(format!("Acer hwmon: {}", path.display()))
-                        .monospace()
-                        .color(dim_text_color()),
-                );
-            } else {
-                ui.colored_label(warning_color(), "Acer hwmon adapter not found.");
-            }
+        constrained_fan_control_panel(ui, |ui| {
+            panel_frame().show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                if let Some(path) = &self.fan_control_status.acer_hwmon_path {
+                    ui.label(
+                        egui::RichText::new(format!("Acer hwmon: {}", path.display()))
+                            .monospace()
+                            .color(dim_text_color()),
+                    );
+                } else {
+                    ui.colored_label(warning_color(), "Acer hwmon adapter not found.");
+                }
 
-            if !self.fan_control_status.can_control() {
-                ui.colored_label(
-                    warning_color(),
-                    "PWM controls are not available for both fans.",
-                );
-            }
+                if !self.fan_control_status.can_control() {
+                    ui.colored_label(
+                        warning_color(),
+                        "PWM controls are not available for both fans.",
+                    );
+                }
 
-            ui.add_space(8.0);
-            pwm_status_row(
-                ui,
-                "CPU PWM",
-                self.fan_control_status.cpu_pwm,
-                self.fan_control_status.cpu_pwm_enable,
-            );
-            pwm_status_row(
-                ui,
-                "GPU PWM",
-                self.fan_control_status.gpu_pwm,
-                self.fan_control_status.gpu_pwm_enable,
-            );
+                ui.add_space(8.0);
+                pwm_status_row(
+                    ui,
+                    "CPU PWM",
+                    self.fan_control_status.cpu_pwm,
+                    self.fan_control_status.cpu_pwm_enable,
+                );
+                pwm_status_row(
+                    ui,
+                    "GPU PWM",
+                    self.fan_control_status.gpu_pwm,
+                    self.fan_control_status.gpu_pwm_enable,
+                );
+            });
         });
 
         ui.add_space(10.0);
-        panel_frame().show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            let cpu_fan_rpm = self.sensor_data().cpu_fan_rpm;
-            let gpu_fan_rpm = self.sensor_data().gpu_fan_rpm;
-            let controls_enabled = self.fan_control_status.can_control();
+        constrained_fan_control_panel(ui, |ui| {
+            panel_frame().show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                let cpu_fan_rpm = self.sensor_data().cpu_fan_rpm;
+                let gpu_fan_rpm = self.sensor_data().gpu_fan_rpm;
+                let controls_enabled = self.fan_control_status.can_control();
 
-            ui.add_space(4.0);
-            let cpu_changed = fan_slider_row(
-                ui,
-                "CPU Fan",
-                &mut self.cpu_fan_percent,
-                cpu_fan_rpm,
-                controls_enabled,
-            );
-            ui.add_space(4.0);
-            let gpu_changed = fan_slider_row(
-                ui,
-                "GPU Fan",
-                &mut self.gpu_fan_percent,
-                gpu_fan_rpm,
-                controls_enabled,
-            );
+                ui.add_space(4.0);
+                let cpu_changed = fan_slider_row(
+                    ui,
+                    "CPU Fan",
+                    &mut self.cpu_fan_percent,
+                    cpu_fan_rpm,
+                    controls_enabled,
+                );
+                ui.add_space(4.0);
+                let gpu_changed = fan_slider_row(
+                    ui,
+                    "GPU Fan",
+                    &mut self.gpu_fan_percent,
+                    gpu_fan_rpm,
+                    controls_enabled,
+                );
 
-            if controls_enabled && (cpu_changed || gpu_changed) {
-                self.schedule_fan_speed_apply(ui.ctx());
-            }
+                if controls_enabled && (cpu_changed || gpu_changed) {
+                    self.schedule_fan_speed_apply(ui.ctx());
+                }
 
-            ui.add_space(12.0);
-            ui.horizontal(|ui| {
+                ui.add_space(12.0);
                 if ui
                     .add_enabled(
                         controls_enabled,
@@ -502,23 +445,22 @@ impl NitroSenseApp {
                 {
                     self.restore_auto_fan_control();
                 }
-                ui.label(
-                    egui::RichText::new("Returns fans to firmware automatic control")
-                        .size(10.5)
-                        .color(dim_text_color()),
-                );
             });
         });
 
         ui.add_space(10.0);
-        self.show_power_profile(ui);
+        constrained_fan_control_panel(ui, |ui| {
+            self.show_power_profile(ui);
+        });
 
-        if let Some(message) = &self.fan_control_message {
+        if let Some(message) = visible_fan_control_message(self.fan_control_message.as_deref()) {
             ui.add_space(8.0);
-            panel_frame().show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.add_space(4.0);
-                    ui.label(message);
+            constrained_fan_control_panel(ui, |ui| {
+                panel_frame().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.add_space(4.0);
+                        ui.label(message);
+                    });
                 });
             });
         }
@@ -592,4 +534,23 @@ fn graph_toggle_chip(ui: &mut egui::Ui, label: &str, enabled: &mut bool) {
     if ui.add(button).clicked() {
         *enabled = !*enabled;
     }
+}
+
+fn constrained_fan_control_panel(ui: &mut egui::Ui, content: impl FnOnce(&mut egui::Ui)) {
+    ui.horizontal(|ui| {
+        ui.add_space(30.0);
+        let panel_width = (ui.available_width() - 30.0).max(320.0) * 0.80;
+        ui.allocate_ui_with_layout(
+            egui::vec2(panel_width, 0.0),
+            egui::Layout::top_down(egui::Align::Min),
+            |ui| {
+                ui.set_width(panel_width);
+                content(ui);
+            },
+        );
+    });
+}
+
+fn visible_fan_control_message(message: Option<&str>) -> Option<&str> {
+    message.filter(|value| *value != "Fan control authorized for this session.")
 }

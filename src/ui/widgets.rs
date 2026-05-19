@@ -4,8 +4,8 @@ use std::time::Duration;
 use crate::app::formatting::format_rpm;
 use crate::app::AppTab;
 use crate::ui::theme::{
-    accent_color, card_surface_color, critical_color, dim_text_color, inner_separator_color,
-    panel_frame, readout_color, sidebar_color, warm_color, warning_color,
+    accent_color, card_surface_color, dim_text_color, panel_frame, readout_color, sidebar_color,
+    warm_color, warning_color,
 };
 
 pub fn nav_button(ui: &mut egui::Ui, active_tab: &mut AppTab, tab: AppTab, label: &str) {
@@ -43,34 +43,6 @@ pub fn nav_button(ui: &mut egui::Ui, active_tab: &mut AppTab, tab: AppTab, label
         *active_tab = tab;
     }
     ui.add_space(6.0);
-}
-
-pub fn compact_metric(ui: &mut egui::Ui, label: &str, value: String) {
-    ui.horizontal(|ui| {
-        ui.vertical(|ui| {
-            ui.set_min_width(112.0);
-            ui.label(
-                egui::RichText::new(label)
-                    .size(10.5)
-                    .color(dim_text_color()),
-            );
-            ui.label(
-                egui::RichText::new(value.clone())
-                    .size(13.5)
-                    .strong()
-                    .color(metric_value_color(label, &value)),
-            );
-        });
-
-        let (rect, _) = ui.allocate_exact_size(egui::vec2(1.0, 34.0), egui::Sense::hover());
-        ui.painter().line_segment(
-            [
-                egui::pos2(rect.center().x, rect.top() + 6.0),
-                egui::pos2(rect.center().x, rect.bottom() - 6.0),
-            ],
-            egui::Stroke::new(1.0, inner_separator_color()),
-        );
-    });
 }
 
 pub fn fan_dashboard_panel(ui: &mut egui::Ui, label: &str, rpm: Option<u32>) {
@@ -179,28 +151,6 @@ pub fn fan_slider_row(
     });
 
     changed
-}
-
-fn metric_value_color(label: &str, value: &str) -> egui::Color32 {
-    if matches!(label, "CPU" | "GPU") && value.ends_with(" C") {
-        if let Ok(value_celsius) = value.trim_end_matches(" C").parse::<f32>() {
-            return temperature_color(value_celsius);
-        }
-    }
-
-    readout_color()
-}
-
-fn temperature_color(value_celsius: f32) -> egui::Color32 {
-    if value_celsius >= 90.0 {
-        critical_color()
-    } else if value_celsius >= 80.0 {
-        warning_color()
-    } else if value_celsius >= 70.0 {
-        warm_color()
-    } else {
-        readout_color()
-    }
 }
 
 fn draw_fan_badge(ui: &mut egui::Ui, rpm: Option<u32>) {
