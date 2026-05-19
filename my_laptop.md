@@ -186,7 +186,7 @@ Implementation decision:
 
 - Read CPU/GPU temperatures from hwmon.
 - Read CPU/GPU fan RPM from Acer hwmon.
-- Read NVMe temperature and battery voltage.
+- Read NVMe temperature. Battery voltage is not shown or read in the current UI.
 - Switch Linux platform profiles.
 - Control CPU/GPU fan PWM through Acer hwmon.
 - Keep temperature graphs plotted in a fixed `0..105 C` range while only labeling

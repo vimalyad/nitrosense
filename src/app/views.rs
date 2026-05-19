@@ -509,7 +509,7 @@ fn graph_toggle_chip(ui: &mut egui::Ui, label: &str, enabled: &mut bool) {
 fn constrained_fan_control_panel(ui: &mut egui::Ui, content: impl FnOnce(&mut egui::Ui)) {
     ui.horizontal(|ui| {
         ui.add_space(10.0);
-        let panel_width = ui.available_width().max(360.0);
+        let panel_width = (ui.available_width() - 20.0).max(360.0);
         ui.allocate_ui_with_layout(
             egui::vec2(panel_width, 0.0),
             egui::Layout::top_down(egui::Align::Min),

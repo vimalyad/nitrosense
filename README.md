@@ -19,7 +19,7 @@ not tracked.
 - Native `egui`/`eframe` desktop UI
 - Direct `/sys` sensor reads without shelling out to `sensors`
 - Dynamic hwmon discovery for changing `/sys/class/hwmon/hwmon*` indexes
-- CPU, GPU, NVMe, fan RPM, battery voltage, and power profile display
+- CPU, GPU, NVMe, fan RPM, and power profile display
 - One-second background polling with Tokio
 - Rolling 35-minute in-memory temperature graph using `egui_plot`, with
   five-minute clock labels, a `0..105 C` plot range, and labels shown only up to
@@ -95,7 +95,7 @@ scripts/install-local.sh release
 Create a release archive:
 
 ```bash
-scripts/package-release.sh 0.1.0-alpha
+scripts/package-release.sh 0.1.0
 ```
 
 The generated `.tar.gz` and checksum are written to `dist/`.
@@ -152,12 +152,15 @@ processes are exempt from that GUI lock.
 - The main window is fixed at `920x600`, non-resizable, with the maximize button
   disabled.
 - The left sidebar is fixed at `176px`.
-- Monitoring, temperature graph, and fan-control panels are sized for the
-  remaining fixed content area.
+- Monitoring shows thermal stats and a separate cooling section. Battery
+  voltage is intentionally not shown or read.
+- Temperature graph and fan-control panels are sized for the remaining fixed
+  content area. Fan Control content keeps a 10px left inset and 20px right
+  breathing room.
 - Temperature graph hover labels appear inside the graph only when a real nearby
   sample timestamp exists. If both CPU and GPU graph series are visible, both
   readings are shown; if one series is hidden, only the visible series is shown.
-- Notification status text is subtle and expires after 30 seconds.
+- In-app notification toasts fade after about two seconds.
 
 Launcher icons are installed from `assets/icons/hicolor/`, which contains the
 fixed app sizes declared by Fedora's hicolor theme, including `22x22`, `36x36`,

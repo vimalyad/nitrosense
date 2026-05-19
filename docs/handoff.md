@@ -69,8 +69,8 @@ sudo dnf install gtk3-devel libappindicator-gtk3-devel
 - The main window is intentionally fixed at `920x600`, non-resizable, and has no
   maximize button. Layout code assumes the `176px` sidebar and roughly `744px`
   remaining window width.
-- Notification status text is intentionally subtle and expires after 30 seconds
-  so old thermal alerts do not stay prominent in the UI.
+- Thermal notification status is shown as an in-app toast that fades after about
+  two seconds, so old alerts do not stay prominent in the UI.
 
 ## Branch Flow
 

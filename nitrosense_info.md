@@ -485,7 +485,8 @@ Practical implementation decision:
 - Target window: fixed `920x600`, non-resizable, no maximize button.
 - Sidebar: fixed `176px`; the remaining content area is laid out for the custom
   AN515-58 dashboard rather than arbitrary widescreen scaling.
-- Monitoring view: fixed-width stats grid plus a capped cooling column.
+- Monitoring view: compact thermal stats plus a separate cooling section for CPU
+  and GPU fan RPM. Battery voltage is intentionally not displayed or read.
 - Temperature view: CPU/GPU temperature graph with a 35-minute retained data
   window, five-minute time labels for the latest 30 minutes, and a plotted
   `0..105 C` range with labels only through `100 C`.
@@ -494,6 +495,7 @@ Practical implementation decision:
   displayed.
 - Fan control view: CPU/GPU sliders auto-apply after the debounce period through
   the restricted Polkit helper; failures trigger an attempt to restore automatic
-  fan control.
+  fan control. The Auto button is kept inside the slider panel and restores
+  firmware automatic control.
 - Process model: normal GUI launches are single-instance guarded, while
   `--fan-helper` invocations remain allowed during a running GUI session.
