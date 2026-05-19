@@ -15,6 +15,7 @@ NitroSense is a native Rust desktop app using `eframe`/`egui`.
 - `src/services/polling.rs`: Tokio background polling task that sends `SensorSnapshot` values through a watch channel.
 - `src/services/notifications.rs`: thermal alert thresholds, cooldowns, and `notify-rust` delivery.
 - `src/services/tray.rs`: feature-gated tray integration with a no-op default backend.
+- `src/single_instance.rs`: per-user file lock that prevents multiple GUI instances while allowing privileged fan-helper invocations.
 - `src/graph.rs`: RAM-only rolling graph history and `egui_plot` rendering.
 - `docs/setup.md`: Fedora dependencies and local installation/setup commands.
 
@@ -57,6 +58,10 @@ sudo dnf install gtk3-devel libappindicator-gtk3-devel
   performs validated writes. `scripts/install-local.sh` installs a dedicated
   Polkit policy for `~/.local/bin/nitrosense --fan-helper` with
   `auth_admin_keep`; running a different binary path will not match that policy.
+- The GUI process is single-instance guarded with an exclusive per-user lock
+  under `$XDG_RUNTIME_DIR/nitrosense.lock`, falling back to `/tmp` when needed.
+  The lock is acquired after `--fan-helper` handling so Polkit helper processes
+  can still run while the GUI is open.
 
 ## Branch Flow
 

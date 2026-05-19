@@ -25,6 +25,7 @@ not tracked.
 - Platform power profile switching
 - Acer `acer-wmi` hwmon PWM fan control for the AN515-58
 - Thermal desktop notifications
+- Single-instance process guard for the GUI
 - Feature-gated system tray support
 - Desktop entry and setup documentation
 - Correctly sized hicolor application icons for desktop launchers
@@ -144,6 +145,7 @@ touchpoints, so validate setup on your own machine before relying on the app.
 - `src/ui/`: Nitro-style theme and reusable egui widgets
 - `src/hardware/`: `/sys` sensor discovery, platform profiles, and Acer hwmon fan control
 - `src/services/`: background polling, thermal notifications, and tray integration
+- `src/single_instance.rs`: per-user runtime lock that prevents multiple GUI instances
 - `src/graph.rs`: rolling graph history and rendering
 - `docs/setup.md`: Fedora setup and install notes
 - `docs/handoff.md`: architecture and continuation notes

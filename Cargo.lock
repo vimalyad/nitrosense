@@ -2532,6 +2532,7 @@ dependencies = [
  "eframe",
  "egui_plot",
  "image",
+ "libc",
  "notify-rust",
  "serde",
  "serde_json",
