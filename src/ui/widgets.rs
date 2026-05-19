@@ -116,7 +116,7 @@ pub fn fan_slider_row(
         );
 
         let mut value = *percent as f32;
-        let slider_width = (ui.available_width() - 42.0 - 90.0 - 16.0).max(200.0);
+        let slider_width = (ui.available_width() - 42.0 - 72.0 - 12.0).max(180.0);
         let response = ui.add_enabled_ui(enabled, |ui| {
             ui.add_sized(
                 [slider_width, 20.0],
@@ -141,13 +141,14 @@ pub fn fan_slider_row(
             readout_color(),
         );
 
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.label(
+        ui.add_sized(
+            [72.0, 20.0],
+            egui::Label::new(
                 egui::RichText::new(format_rpm(rpm))
                     .size(11.5)
                     .color(dim_text_color()),
-            );
-        });
+            ),
+        );
     });
 
     changed

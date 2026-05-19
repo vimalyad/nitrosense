@@ -106,12 +106,6 @@ impl NitroSenseApp {
                         .strong()
                         .color(accent_color()),
                 );
-                ui.label(
-                    self.sensor_data()
-                        .active_power_profile
-                        .as_deref()
-                        .unwrap_or("Unavailable"),
-                );
             });
 
             ui.add_space(6.0);
@@ -221,7 +215,7 @@ impl NitroSenseApp {
 
     pub(super) fn show_active_tab(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.add_space(5.0);
+            ui.add_space(10.0);
             ui.vertical(|ui| {
                 ui.set_width(ui.available_width());
                 match self.active_tab {
@@ -244,7 +238,7 @@ impl NitroSenseApp {
         ui.add_space(18.0);
 
         ui.vertical(|ui| {
-            ui.set_width(ui.available_width());
+            ui.set_width((ui.available_width() - 20.0).max(300.0));
             ui.heading("Cooling");
             ui.add_space(8.0);
             fan_dashboard_panel(ui, "CPU Fan", self.sensor_data().cpu_fan_rpm);
@@ -410,40 +404,49 @@ impl NitroSenseApp {
                 let gpu_fan_rpm = self.sensor_data().gpu_fan_rpm;
                 let controls_enabled = self.fan_control_status.can_control();
 
-                ui.add_space(4.0);
-                let cpu_changed = fan_slider_row(
-                    ui,
-                    "CPU Fan",
-                    &mut self.cpu_fan_percent,
-                    cpu_fan_rpm,
-                    controls_enabled,
-                );
-                ui.add_space(4.0);
-                let gpu_changed = fan_slider_row(
-                    ui,
-                    "GPU Fan",
-                    &mut self.gpu_fan_percent,
-                    gpu_fan_rpm,
-                    controls_enabled,
-                );
+                let mut cpu_changed = false;
+                let mut gpu_changed = false;
+                ui.horizontal(|ui| {
+                    let slider_width = (ui.available_width() - 82.0).max(260.0);
+                    ui.vertical(|ui| {
+                        ui.set_width(slider_width);
+                        ui.add_space(4.0);
+                        cpu_changed = fan_slider_row(
+                            ui,
+                            "CPU Fan",
+                            &mut self.cpu_fan_percent,
+                            cpu_fan_rpm,
+                            controls_enabled,
+                        );
+                        ui.add_space(4.0);
+                        gpu_changed = fan_slider_row(
+                            ui,
+                            "GPU Fan",
+                            &mut self.gpu_fan_percent,
+                            gpu_fan_rpm,
+                            controls_enabled,
+                        );
+                    });
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui
+                            .add_enabled(
+                                controls_enabled,
+                                egui::Button::new(
+                                    egui::RichText::new("Auto").color(accent_color()).strong(),
+                                )
+                                .fill(egui::Color32::TRANSPARENT)
+                                .stroke(egui::Stroke::new(1.0, accent_color())),
+                            )
+                            .clicked()
+                        {
+                            self.restore_auto_fan_control();
+                        }
+                    });
+                });
 
                 if controls_enabled && (cpu_changed || gpu_changed) {
                     self.schedule_fan_speed_apply(ui.ctx());
-                }
-
-                ui.add_space(12.0);
-                if ui
-                    .add_enabled(
-                        controls_enabled,
-                        egui::Button::new(
-                            egui::RichText::new("Auto").color(accent_color()).strong(),
-                        )
-                        .fill(egui::Color32::TRANSPARENT)
-                        .stroke(egui::Stroke::new(1.0, accent_color())),
-                    )
-                    .clicked()
-                {
-                    self.restore_auto_fan_control();
                 }
             });
         });
@@ -514,8 +517,8 @@ fn pwm_mode_label(mode: Option<u8>) -> String {
 fn graph_toggle_chip(ui: &mut egui::Ui, label: &str, enabled: &mut bool) {
     let (fill, stroke, text_color) = if *enabled {
         (
-            egui::Color32::from_rgb(60, 18, 22),
-            egui::Stroke::new(1.0, accent_color()),
+            egui::Color32::from_rgb(45, 49, 55),
+            egui::Stroke::new(1.0, egui::Color32::from_rgb(90, 96, 104)),
             egui::Color32::WHITE,
         )
     } else {
@@ -539,7 +542,7 @@ fn graph_toggle_chip(ui: &mut egui::Ui, label: &str, enabled: &mut bool) {
 fn constrained_fan_control_panel(ui: &mut egui::Ui, content: impl FnOnce(&mut egui::Ui)) {
     ui.horizontal(|ui| {
         ui.add_space(30.0);
-        let panel_width = (ui.available_width() - 30.0).max(320.0) * 0.80;
+        let panel_width = ((ui.available_width() - 30.0).max(320.0) * 0.80).max(360.0);
         ui.allocate_ui_with_layout(
             egui::vec2(panel_width, 0.0),
             egui::Layout::top_down(egui::Align::Min),
