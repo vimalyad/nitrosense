@@ -1,4 +1,5 @@
 use eframe::egui;
+use std::time::Duration;
 
 use crate::app::formatting::format_rpm;
 use crate::app::AppTab;
@@ -73,6 +74,7 @@ pub fn compact_metric(ui: &mut egui::Ui, label: &str, value: String) {
 }
 
 pub fn fan_dashboard_panel(ui: &mut egui::Ui, label: &str, rpm: Option<u32>) {
+    ui.ctx().request_repaint_after(Duration::from_millis(16));
     panel_frame().show(ui, |ui| {
         ui.set_min_width(262.0);
         ui.horizontal(|ui| {
@@ -209,12 +211,14 @@ fn draw_fan_badge(ui: &mut egui::Ui, rpm: Option<u32>) {
     let speed = rpm
         .map(|value| (value as f32 / 7_500.0).clamp(0.15, 1.0))
         .unwrap_or(0.15);
+    let elapsed = ui.ctx().input(|input| input.time) as f32;
+    let rotation = elapsed * (3.0 + speed * 10.0);
 
     painter.circle_filled(center, radius, egui::Color32::from_rgb(24, 26, 30));
     painter.circle_stroke(center, radius, egui::Stroke::new(2.0, accent_color()));
 
     for blade in 0..3 {
-        let angle = blade as f32 * std::f32::consts::TAU / 3.0 + speed;
+        let angle = blade as f32 * std::f32::consts::TAU / 3.0 + rotation;
         let tip = center + egui::vec2(angle.cos(), angle.sin()) * 24.0;
         let side = center + egui::vec2((angle + 1.95).cos(), (angle + 1.95).sin()) * 10.0;
         painter.line_segment(

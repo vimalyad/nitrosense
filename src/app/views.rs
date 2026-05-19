@@ -2,7 +2,7 @@ use eframe::egui;
 
 use super::{AppTab, NitroSenseApp};
 use crate::app::formatting::{
-    display_profile_name, fallback_profile_names, format_pwm_state, format_rpm, format_temperature,
+    display_profile_name, fallback_profile_names, format_pwm_state, format_temperature,
     format_voltage,
 };
 use crate::graph::show_graph;
@@ -63,7 +63,7 @@ impl NitroSenseApp {
         nav_button(ui, &mut self.active_tab, AppTab::Graph, "Temperature");
         nav_button(ui, &mut self.active_tab, AppTab::FanControl, "Fan Control");
 
-        let footer_gap = (ui.available_height() - 104.0).max(16.0);
+        let footer_gap = (ui.available_height() - 154.0).max(12.0);
         ui.add_space(footer_gap);
         ui.vertical_centered(|ui| {
             ui.label(
@@ -81,6 +81,17 @@ impl NitroSenseApp {
                 )
                 .size(12.5)
                 .color(egui::Color32::from_rgb(200, 206, 212)),
+            );
+            ui.add_space(16.0);
+            ui.label(
+                egui::RichText::new("❤️ created by")
+                    .size(10.5)
+                    .color(dim_text_color()),
+            );
+            ui.label(
+                egui::RichText::new("vimalyad")
+                    .size(12.0)
+                    .color(egui::Color32::from_rgb(200, 206, 212)),
             );
         });
         ui.add_space(12.0);
@@ -110,20 +121,6 @@ impl NitroSenseApp {
                             "GPU",
                             format_temperature(self.sensor_data().nvidia_gpu_temp_celsius),
                         );
-                    },
-                );
-                ui.allocate_ui_with_layout(
-                    egui::vec2(124.0, 40.0),
-                    egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                    |ui| {
-                        compact_metric(ui, "CPU Fan", format_rpm(self.sensor_data().cpu_fan_rpm));
-                    },
-                );
-                ui.allocate_ui_with_layout(
-                    egui::vec2(124.0, 40.0),
-                    egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                    |ui| {
-                        compact_metric(ui, "GPU Fan", format_rpm(self.sensor_data().gpu_fan_rpm));
                     },
                 );
                 ui.allocate_ui_with_layout(
@@ -232,28 +229,6 @@ impl NitroSenseApp {
                 );
                 self.stat_card(
                     ui,
-                    "CPU Fan",
-                    format_rpm(self.sensor_data().cpu_fan_rpm),
-                    "Fan 1",
-                );
-                ui.end_row();
-
-                self.stat_card(
-                    ui,
-                    "GPU Fan",
-                    format_rpm(self.sensor_data().gpu_fan_rpm),
-                    "Fan 2",
-                );
-                self.stat_card(
-                    ui,
-                    "Battery",
-                    format_voltage(self.sensor_data().battery_voltage),
-                    "BAT1",
-                );
-                ui.end_row();
-
-                self.stat_card(
-                    ui,
                     "Profile",
                     self.sensor_data()
                         .active_power_profile
@@ -267,8 +242,6 @@ impl NitroSenseApp {
 
     fn stat_card(&self, ui: &mut egui::Ui, title: &str, value: String, detail: &str) {
         stat_card_frame().show(ui, |ui| {
-            ui.set_min_width(188.0);
-            ui.set_max_width(188.0);
             ui.label(
                 egui::RichText::new(title)
                     .size(11.0)
@@ -291,11 +264,17 @@ impl NitroSenseApp {
     }
 
     pub(super) fn show_active_tab(&mut self, ui: &mut egui::Ui) {
-        match self.active_tab {
-            AppTab::Overview => self.show_overview_tab(ui),
-            AppTab::Graph => self.show_graph_tab(ui),
-            AppTab::FanControl => self.show_fan_control_tab(ui),
-        }
+        ui.horizontal(|ui| {
+            ui.add_space(5.0);
+            ui.vertical(|ui| {
+                ui.set_width(ui.available_width());
+                match self.active_tab {
+                    AppTab::Overview => self.show_overview_tab(ui),
+                    AppTab::Graph => self.show_graph_tab(ui),
+                    AppTab::FanControl => self.show_fan_control_tab(ui),
+                }
+            });
+        });
     }
 
     fn show_overview_tab(&self, ui: &mut egui::Ui) {
@@ -305,7 +284,7 @@ impl NitroSenseApp {
             .show(ui, |ui| {
                 ui.vertical(|ui| {
                     ui.set_width(ui.available_width());
-                    ui.heading("Monitoring");
+                    ui.heading("Thermals");
                     ui.add_space(8.0);
                     self.show_stats(ui);
                 });
@@ -327,36 +306,40 @@ impl NitroSenseApp {
                     ui.add_space(8.0);
                     fan_dashboard_panel(ui, "GPU Fan", self.sensor_data().gpu_fan_rpm);
                     ui.add_space(8.0);
-                    let (rect, _) =
-                        ui.allocate_exact_size(egui::vec2(310.0, 1.0), egui::Sense::hover());
-                    ui.painter().line_segment(
-                        [rect.left_center(), rect.right_center()],
-                        egui::Stroke::new(1.0, inner_separator_color()),
-                    );
+                });
+
+                ui.add_space(18.0);
+
+                ui.vertical(|ui| {
+                    ui.set_width(ui.available_width());
+                    ui.heading("Battery");
                     ui.add_space(8.0);
-                    stat_card_frame().show(ui, |ui| {
-                        ui.set_min_width(282.0);
-                        ui.label(
-                            egui::RichText::new("Battery")
-                                .size(11.0)
-                                .strong()
-                                .color(accent_color()),
-                        );
-                        ui.add_space(2.0);
-                        ui.label(
-                            egui::RichText::new(format_voltage(self.sensor_data().battery_voltage))
-                                .size(20.0)
-                                .color(readout_color()),
-                        );
-                        ui.add_space(2.0);
-                        ui.label(
-                            egui::RichText::new("BAT1")
-                                .size(10.5)
-                                .color(dim_text_color()),
-                        );
-                    });
+                    self.battery_panel(ui);
                 });
             });
+    }
+
+    fn battery_panel(&self, ui: &mut egui::Ui) {
+        stat_card_frame().show(ui, |ui| {
+            ui.label(
+                egui::RichText::new("Battery")
+                    .size(11.0)
+                    .strong()
+                    .color(accent_color()),
+            );
+            ui.add_space(2.0);
+            ui.label(
+                egui::RichText::new(format_voltage(self.sensor_data().battery_voltage))
+                    .size(20.0)
+                    .color(readout_color()),
+            );
+            ui.add_space(2.0);
+            ui.label(
+                egui::RichText::new("BAT1")
+                    .size(10.5)
+                    .color(dim_text_color()),
+            );
+        });
     }
 
     pub(super) fn show_app_toast(&self, context: &egui::Context) {
